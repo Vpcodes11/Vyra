@@ -1,0 +1,1 @@
+{"name":"vyra-energy","version":"1.0.0","private":true,"description":"Cinematic VYRA product experience","scripts":{"start":"node server.cjs","check":"node --check dist/app.js"}}
