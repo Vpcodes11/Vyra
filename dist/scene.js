@@ -47,12 +47,11 @@ function label(index){
   const printPixels=pc.createImageData(maskSize,maskSize);
   for(let n=0;n<pixels.data.length;n+=4){
     const bright=Math.max(pixels.data[n],pixels.data[n+1],pixels.data[n+2]);
-    const x=(n/4)%maskSize,y=Math.floor(n/4/maskSize);
+    const x=(n/4)%maskSize;
     const dx=(x-maskSize*1540/2048)/(maskSize*410/2048);
-    const dy=(y-maskSize*1000/2048)/(maskSize*235/2048);
-    // A small pool of light catches one back-label paragraph. The rest of
-    // the print receives no emissive light when the room goes dark.
-    const beam=Math.exp(-2*(dx*dx+dy*dy));
+    // Keep all three back-label lines in one texture. The shader moves a
+    // narrow light over them, so scrolling never rebuilds or uploads artwork.
+    const beam=Math.exp(-2*dx*dx);
     const ink=x>maskSize*1150/2048&&x<maskSize*1940/2048&&bright>80?Math.round(255*beam):0;
     printPixels.data[n]=printPixels.data[n+1]=printPixels.data[n+2]=ink;printPixels.data[n+3]=255;
     const v=bright>160?46:215;pixels.data[n]=v;pixels.data[n+1]=v;pixels.data[n+2]=v;
@@ -77,6 +76,14 @@ function can(index){
   for(let i=0;i<geometry.attributes.uv.count;i++)geometry.attributes.uv.setY(i,(geometry.attributes.position.getY(i)+1.75)/3.44);
   const artwork=label(index);
   const material=new THREE.MeshPhysicalMaterial({map:artwork.color,metalnessMap:artwork.metalness,metalness:1,roughness:.31,clearcoat:.92,clearcoatRoughness:.16,envMapIntensity:1.05,bumpMap:brushed,bumpScale:.0007,emissive:new THREE.Color(colors[index]),emissiveMap:artwork.emissive,emissiveIntensity:0});
+  const textLightY={value:1-1000/2048};
+  material.onBeforeCompile=shader=>{
+    shader.uniforms.textLightY=textLightY;
+    shader.fragmentShader=shader.fragmentShader.replace('#include <emissivemap_fragment>',`#include <emissivemap_fragment>
+      float textBeam = exp(-0.5 * pow((vEmissiveMapUv.y - textLightY) / 0.052, 2.0));
+      totalEmissiveRadiance *= textBeam;`);
+    shader.fragmentShader=shader.fragmentShader.replace('void main() {','uniform float textLightY;\nvoid main() {');
+  };
   g.add(new THREE.Mesh(geometry,material));
   const metal=new THREE.MeshPhysicalMaterial({color:'#d7d9d8',metalness:1,roughness:.27,envMapIntensity:1.5,bumpMap:brushed,bumpScale:.0015});
   const lid=new THREE.Group();
@@ -99,7 +106,7 @@ function can(index){
   const footRing=new THREE.Mesh(new THREE.TorusGeometry(.413,.018,10,96),metal);footRing.rotation.x=Math.PI/2;footRing.position.y=.018;bottom.add(footRing);
   const footInset=new THREE.Mesh(new THREE.CircleGeometry(.32,80),new THREE.MeshPhysicalMaterial({color:'#57575c',metalness:.9,roughness:.35}));footInset.rotation.x=-Math.PI/2;footInset.position.y=.019;bottom.add(footInset);
   bottom.position.y=-1.73;g.add(bottom);
-  g.userData={index,material,lid,bottom};return g;
+  g.userData={index,material,lid,bottom,textLightY};return g;
 }
 function lighting(){
   const room=new THREE.Scene();room.background=new THREE.Color('#08080b');
@@ -135,6 +142,10 @@ function draw(now){
   state.scroll+=(target-state.scroll)*(state.motion?1-Math.exp(-dt*9):1);
   const mobile=innerWidth<=760,H=innerHeight;
   const focusWindow=smooth((state.scroll-.27)/.10)*(1-smooth((state.scroll-.60)/.12));
+  const textSweep=THREE.MathUtils.clamp((state.scroll-.37)/.24,0,1);
+  const secondLine=smooth((textSweep-.18)/.25);
+  const thirdLine=smooth((textSweep-.58)/.25);
+  const textLightY=1-(1000+250*secondLine+250*thirdLine)/2048;
   const lateZoom=smooth((state.scroll-.7)/.2);
   const focusStyle=focusWindow.toFixed(3);
   if(focusStyle!==lastFocusStyle){
@@ -175,13 +186,16 @@ function draw(now){
     // Keep the modeled body at the same classic-can aspect ratio as the
     // artwork shown while WebGL initializes, including through the zoom.
     m.scale.set(Math.max(.0001,scl*1.36),Math.max(.0001,scl),Math.max(.0001,scl*1.36));m.visible=scl>.01&&rect.bottom>0;
-    const rotation=state.motion?state.scroll*Math.PI*2:(Math.floor(target*3)===1?Math.PI:0);
+    // Turn to the back, hold it still while the light reads each line,
+    // then rotate away only after the final line has been featured.
+    const rotation=state.motion?Math.PI*(smooth((state.scroll-.15)/.22)+smooth((state.scroll-.68)/.22)):(Math.floor(target*3)===1?Math.PI:0);
     m.rotation.set(.08,THREE.MathUtils.lerp((1-focus)*Math.PI*.92,rotation,t)+state.pointer.x*.055*focus-velocity*.1,THREE.MathUtils.lerp(.24*focus+Math.sin(i*1.9)*.065*(1-focus),-.1+Math.cos(state.scroll*Math.PI*2)*.34-lateZoom*.55,t)+state.pointer.y*.025*focus+velocity*.025);
     // The selected object and its reflections move as a single continuous model.
     m.userData.material.envMapIntensity=(.2+focus*.95+enter*.25)*(1-focusWindow*.91);
     m.userData.material.color.setScalar(.25+focus*.75-(selected?focusWindow*.78:0));
     m.userData.material.clearcoat=.3+focus*.65;
     m.userData.material.emissiveIntensity=selected?focusWindow*3.7:0;
+    m.userData.textLightY.value=textLightY;
     const explode=focus*(1-enter);
     m.userData.lid.position.y=1.71+.49*explode;
     m.userData.lid.rotation.x=.55*explode;
@@ -192,8 +206,9 @@ function draw(now){
   const lightDamping=state.motion?1-Math.exp(-dt*5):1;
   follow(shoulderSpot.position,focusModel.position.x-s*1.7+state.pointer.x*.18,focusModel.position.y+s*1.4+state.pointer.y*.12,focusModel.position.z+2.7,lightDamping);
   follow(shoulderSpot.target.position,focusModel.position.x,focusModel.position.y+s*.85,focusModel.position.z,lightDamping);
-  follow(flavorSpot.position,focusModel.position.x+s*(1.6-focusWindow*1.05)-state.pointer.x*.24,focusModel.position.y+s*(-.75+focusWindow*.95)+state.pointer.y*.1,focusModel.position.z+2.4,lightDamping);
-  follow(flavorSpot.target.position,focusModel.position.x,focusModel.position.y+s*(-.7+focusWindow*.88),focusModel.position.z,lightDamping);
+  const beamHeight=s*(.18-.39*secondLine-.39*thirdLine);
+  follow(flavorSpot.position,focusModel.position.x+s*(1.6-focusWindow*1.05)-state.pointer.x*.24,focusModel.position.y+beamHeight+s*.3+state.pointer.y*.1,focusModel.position.z+2.4,lightDamping);
+  follow(flavorSpot.target.position,focusModel.position.x,focusModel.position.y+beamHeight,focusModel.position.z,lightDamping);
   renderer.render(scene,camera);
   window.vyra3d.stats={calls:renderer.info.render.calls,triangles:renderer.info.render.triangles};
 }

@@ -48,6 +48,8 @@ The collection and middle chapter were inspected in-browser after this revision.
 
 The original video was reviewed again for the middle scroll beat. The studio softboxes now dim together while a tighter flavor-colored beam catches one small group of back-label text. The can's other print stays dark; the background retains a soft flavor glow instead of fading to black. The text-focus moment was checked on desktop and mobile in the local preview, followed by the brighter final chapter.
 
+The focus beat now continues down the three lines of back-label copy as the user scrolls. The can pauses with its back facing the viewer, while a shader-controlled light band and the physical flavor spotlight travel from the first line to the second and third. The band moves smoothly and briefly holds each line; it uses one static emissive map, so scrolling does not rebuild textures. All three positions were visually checked in the running desktop preview.
+
 ## Performance
 
 The five can labels now use 1024px color maps and 512px lighting masks. This cuts their raw texture pixels by about eight times compared with the earlier 2048px maps while preserving the visible print and spotlight. The renderer caps its pixel ratio at 1.4 on desktop and 1.2 on mobile, skips 3D rendering after the product experience leaves the viewport, and avoids rewriting unchanged lighting styles every frame. Pointer parallax updates once per animation frame. The flavor carousel and scroll spotlight were checked in the local preview after these changes.
