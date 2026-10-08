@@ -37,3 +37,5 @@ Product images: original AI-generated artwork created for this project. Anton: V
 ## Premium material revision
 
 The can now has a refined multi-ring shoulder, rolled metal seams, recessed aluminum lid, extruded pull tab with rivet, and a concave base. Separate print/metal reflectance maps preserve the ivory label while the lacquer carries broader studio reflections. Locally bundled area lights provide warm softbox fill, a narrow white rim, overhead metal highlights, and flavor-colored fill. Aluminum uses a subtle deterministic brushed bump texture. Supporting cans have reduced exposure and clearcoat to maintain selected-product emphasis.
+
+The selected product also has two restrained spotlights aimed at different parts of its body: a warm shoulder glint and a flavor-colored reflection near the lower label. Their position and color ease with the carousel and scroll transition, and pointer movement shifts the highlights subtly on desktop.

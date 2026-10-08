@@ -5,7 +5,7 @@ import {RectAreaLightUniformsLib} from './vendor/addons/RectAreaLightUniformsLib
 const state={index:0,position:0,scroll:0,motion:true,pointer:new THREE.Vector2()};
 const colors=['#6150ce','#bb155d','#b3bc35','#239d86','#c57632'];
 const lacquer=['#120e24','#220a16','#151707','#0b1b18','#211208'];
-let renderer,scene,camera,models=[],environment,accentLight,softbox,active=true,last=performance.now();
+let renderer,scene,camera,models=[],environment,accentLight,softbox,shoulderSpot,flavorSpot,active=true,last=performance.now();
 const canvas=document.createElement('canvas');canvas.className='product-canvas';canvas.setAttribute('aria-hidden','true');
 document.body.append(canvas);
 
@@ -89,15 +89,24 @@ function lighting(){
   const edge=new THREE.RectAreaLight('#ffffff',7,.42,7);edge.position.set(3,.6,-1);edge.lookAt(0,0,0);scene.add(edge);
   const ceiling=new THREE.RectAreaLight('#ffffff',3.5,5,1.2);ceiling.position.set(0,4.5,2);ceiling.lookAt(0,0,0);scene.add(ceiling);
   accentLight=new THREE.RectAreaLight(colors[0],3.5,1.1,7);accentLight.position.set(-2,-.5,2);accentLight.lookAt(0,0,0);scene.add(accentLight);
+  shoulderSpot=new THREE.SpotLight('#fff5ed',18,5,.31,.95,1.5);
+  flavorSpot=new THREE.SpotLight(colors[0],33,5,.34,.95,1.5);
+  scene.add(shoulderSpot,shoulderSpot.target,flavorSpot,flavorSpot.target);
 }
 function resize(){const w=innerWidth,h=innerHeight;renderer.setSize(w,h,false);renderer.setPixelRatio(Math.min(devicePixelRatio,w<760?1.5:1.75));camera.aspect=w/h;camera.updateProjectionMatrix();}
 const smooth=(x)=>{x=THREE.MathUtils.clamp(x,0,1);return x*x*(3-2*x);};
+const follow=(vector,x,y,z,damping)=>{
+  vector.set(THREE.MathUtils.lerp(vector.x,x,damping),THREE.MathUtils.lerp(vector.y,y,damping),THREE.MathUtils.lerp(vector.z,z,damping));
+};
 function draw(now){
   requestAnimationFrame(draw);if(!active)return;
   const dt=Math.min((now-last)/1000,.05);last=now;
   const damping=state.motion?1-Math.exp(-dt*7.5):1;
   const velocity=state.index-state.position;state.position+=velocity*damping;
-  accentLight.color.lerp(new THREE.Color(colors[((Math.round(state.index)%5)+5)%5]),damping);
+  const selectedIndex=((Math.round(state.index)%5)+5)%5;
+  const flavorColor=new THREE.Color(colors[selectedIndex]);
+  accentLight.color.lerp(flavorColor,damping);
+  flavorSpot.color.lerp(flavorColor,damping);
   const exp=document.querySelector('#experience'),rect=exp.getBoundingClientRect();
   const target=THREE.MathUtils.clamp(-rect.top/(exp.offsetHeight-innerHeight),0,1);
   state.scroll+=(target-state.scroll)*(state.motion?1-Math.exp(-dt*9):1);
@@ -135,6 +144,12 @@ function draw(now){
     m.userData.bottom.position.y=-1.73-.28*explode;
     m.userData.bottom.rotation.x=.32*explode;
   });
+  const focusModel=models[selectedIndex],s=focusModel.scale.x;
+  const lightDamping=state.motion?1-Math.exp(-dt*5):1;
+  follow(shoulderSpot.position,focusModel.position.x-s*1.7+state.pointer.x*.18,focusModel.position.y+s*1.4+state.pointer.y*.12,focusModel.position.z+2.7,lightDamping);
+  follow(shoulderSpot.target.position,focusModel.position.x,focusModel.position.y+s*.85,focusModel.position.z,lightDamping);
+  follow(flavorSpot.position,focusModel.position.x+s*1.6-state.pointer.x*.24,focusModel.position.y-s*.75+state.pointer.y*.1,focusModel.position.z+2.4,lightDamping);
+  follow(flavorSpot.target.position,focusModel.position.x,focusModel.position.y-s*.7,focusModel.position.z,lightDamping);
   renderer.render(scene,camera);
   window.vyra3d.stats={calls:renderer.info.render.calls,triangles:renderer.info.render.triangles};
 }
