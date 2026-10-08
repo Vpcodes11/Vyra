@@ -110,13 +110,13 @@ function draw(now){
   models.forEach((m,i)=>{
     let offset=i-state.position;offset=((offset+2.5)%5+5)%5-2.5;
     const focus=1-smooth(Math.abs(offset));const selected=i===((Math.round(state.index)%5)+5)%5;
-    const heroHeight=mobile?Math.min(H*.41,360):Math.min(H*.45,460);
+    const heroHeight=mobile?Math.min(H*.41,360):Math.min(H*(H<760?.40:.45),460);
     const heroScale=visibleHeight*heroHeight/H/3.5;
     const detailHeight=mobile?H*.43:Math.min(H*.77,720);
     const detailScale=visibleHeight*detailHeight/H/3.5;
     const gap=mobile?1.05:vw*.185;
     const x=offset*gap;
-    const heroY=visibleHeight*(mobile?.035:.045)+.11*focus+Math.sin(i*2.2)*.08*(1-focus);
+    const heroY=visibleHeight*(mobile?.035:.045)+(.11+(!mobile&&H<760?.12:0))*focus+Math.sin(i*2.2)*.08*(1-focus);
     const detailX=mobile?vw*.035:vw*.14;
     const detailY=visibleHeight*(mobile?.11:0)+visibleHeight*exit;
     const t=selected?enter:0;
