@@ -68,9 +68,16 @@ function can(index){
   const opening=new THREE.Mesh(new THREE.RingGeometry(.092,.105,48),new THREE.MeshStandardMaterial({color:'#707276',metalness:.9,roughness:.4}));opening.rotation.x=-Math.PI/2;opening.scale.y=1.45;opening.position.set(0,.022,-.2);lid.add(opening);
   const recessed=new THREE.Mesh(new THREE.CylinderGeometry(.345,.345,.008,64),metal);recessed.position.y=.018;lid.add(recessed);
   lid.position.y=1.71;g.add(lid);
+  // A dark well and a rolled rim remain on the can when the real lid lifts.
+  const openingWell=new THREE.Mesh(new THREE.CylinderGeometry(.395,.395,.012,80),new THREE.MeshPhysicalMaterial({color:'#07080a',metalness:.72,roughness:.48}));openingWell.position.y=1.672;g.add(openingWell);
+  const mouthRim=new THREE.Mesh(new THREE.TorusGeometry(.426,.014,8,96),metal);mouthRim.rotation.x=Math.PI/2;mouthRim.position.y=1.68;g.add(mouthRim);
   const base=new THREE.Mesh(new THREE.TorusGeometry(.423,.027,12,96),metal);base.rotation.x=Math.PI/2;base.position.y=-1.73;g.add(base);
-  const bottom=new THREE.Mesh(new THREE.LatheGeometry([new THREE.Vector2(0,-1.69),new THREE.Vector2(.32,-1.69),new THREE.Vector2(.395,-1.75),new THREE.Vector2(.425,-1.75)],80),metal);g.add(bottom);
-  g.userData={index,material,lid};return g;
+  const bottom=new THREE.Group();
+  const foot=new THREE.Mesh(new THREE.CylinderGeometry(.414,.414,.032,80),metal);bottom.add(foot);
+  const footRing=new THREE.Mesh(new THREE.TorusGeometry(.413,.018,10,96),metal);footRing.rotation.x=Math.PI/2;footRing.position.y=.018;bottom.add(footRing);
+  const footInset=new THREE.Mesh(new THREE.CircleGeometry(.32,80),new THREE.MeshPhysicalMaterial({color:'#57575c',metalness:.9,roughness:.35}));footInset.rotation.x=-Math.PI/2;footInset.position.y=.019;bottom.add(footInset);
+  bottom.position.y=-1.73;g.add(bottom);
+  g.userData={index,material,lid,bottom};return g;
 }
 function lighting(){
   const room=new THREE.Scene();room.background=new THREE.Color('#08080b');
@@ -109,7 +116,7 @@ function draw(now){
     const detailScale=visibleHeight*detailHeight/H/3.5;
     const gap=mobile?1.05:vw*.185;
     const x=offset*gap;
-    const heroY=visibleHeight*(mobile?.035:.045);
+    const heroY=visibleHeight*(mobile?.035:.045)+.11*focus+Math.sin(i*2.2)*.08*(1-focus);
     const detailX=mobile?vw*.035:vw*.14;
     const detailY=visibleHeight*(mobile?.11:0)+visibleHeight*exit;
     const t=selected?enter:0;
@@ -117,11 +124,16 @@ function draw(now){
     const scl=THREE.MathUtils.lerp(heroScale*(.85+.2*focus),detailScale,t)*(selected?1:1-enter);
     m.scale.setScalar(Math.max(.0001,scl));m.visible=scl>.01&&rect.bottom>0;
     const rotation=state.motion?state.scroll*Math.PI*2:(Math.floor(target*3)===1?Math.PI:0);
-    m.rotation.set(.08,THREE.MathUtils.lerp((1-focus)*Math.PI*.92,rotation,t)+state.pointer.x*.055*focus-velocity*.1,THREE.MathUtils.lerp(.24*focus,-.1+Math.cos(state.scroll*Math.PI*2)*.34,t)+state.pointer.y*.025*focus+velocity*.025);
+    m.rotation.set(.08,THREE.MathUtils.lerp((1-focus)*Math.PI*.92,rotation,t)+state.pointer.x*.055*focus-velocity*.1,THREE.MathUtils.lerp(.24*focus+Math.sin(i*1.9)*.065*(1-focus),-.1+Math.cos(state.scroll*Math.PI*2)*.34,t)+state.pointer.y*.025*focus+velocity*.025);
     // The selected object and its reflections move as a single continuous model.
     m.userData.material.envMapIntensity=.2+focus*.95+enter*.25;
     m.userData.material.color.setScalar(.25+focus*.75);
     m.userData.material.clearcoat=.3+focus*.65;
+    const explode=focus*(1-enter);
+    m.userData.lid.position.y=1.71+.49*explode;
+    m.userData.lid.rotation.x=.55*explode;
+    m.userData.bottom.position.y=-1.73-.28*explode;
+    m.userData.bottom.rotation.x=.32*explode;
   });
   renderer.render(scene,camera);
   window.vyra3d.stats={calls:renderer.info.render.calls,triangles:renderer.info.render.triangles};

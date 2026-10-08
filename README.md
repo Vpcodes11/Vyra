@@ -8,7 +8,7 @@ With Node.js installed, run `npm start` and open `http://127.0.0.1:3000`. Use an
 
 ## Experience
 
-- Continuous five-can WebGL carousel with damped movement, subtle settling sway, complete modeled lids/pull tabs, metallic reflections, and smoothly interpolated flavor lighting. The detached cropped-image lid accents have been removed.
+- Continuous five-can WebGL carousel with damped movement, subtle settling sway, modeled lids and pull tabs, metallic reflections, and smoothly interpolated flavor lighting. The selected can's modeled lid and base separate in the collection, then close into place as the product moves into its detail chapter.
 - Drag, swipe, arrow buttons, color selectors, and keyboard Left/Right/Home/End.
 - Three scroll-controlled product chapters with actual continuous 360-degree model rotation and a single uninterrupted transition from lineup to close-up.
 - Responsive desktop, tablet and mobile layouts; local display font; no third-party runtime requests.
@@ -22,7 +22,7 @@ With Node.js installed, run `npm start` and open `http://127.0.0.1:3000`. Use an
 
 The reference is an angled camera recording of a laptop, not original website source or a clean screen capture. Its visible composition and progression were inspected at one-second intervals. The result follows that visible experience but does not claim pixel-identical measurements or unseen interactions.
 
-The main product presentation uses modeled can bodies, lids, rims and pull tabs, physically based clearcoat materials, a studio reflection environment, and accent lighting. Labels are original brand typography wrapped around the cylinders. WebGL-unavailable devices retain the image-based fallback. The cropped floating lid has been removed. VYRA remains fictional and has no checkout or manufactured formula.
+The main product presentation uses modeled can bodies, lids, rims and pull tabs, physically based clearcoat materials, a studio reflection environment, and accent lighting. Labels are original brand typography wrapped around the cylinders. WebGL-unavailable devices retain the image-based fallback. The former cropped floating lid image has been replaced with moving 3D metal parts. VYRA remains fictional and has no checkout or manufactured formula.
 
 ## Verification
 

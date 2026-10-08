@@ -42,3 +42,4 @@
 /* Saturated stage light, like the recorded product chapters. */
 .detail-glow{background:radial-gradient(ellipse at 62% 79%,color-mix(in srgb,var(--light-color) 96%,transparent) 0%,color-mix(in srgb,var(--light-color) 78%,transparent) 30%,color-mix(in srgb,var(--light-color) 30%,transparent) 62%,transparent 85%)}
 .ambient{background:radial-gradient(ellipse at 50% 100%,color-mix(in srgb,var(--light-color) 45%,transparent),transparent 42%)}
+@media(max-width:760px){.selection{bottom:70px}}
