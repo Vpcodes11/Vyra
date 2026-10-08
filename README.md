@@ -52,6 +52,8 @@ The focus beat now continues down the three lines of back-label copy as the user
 
 The product experience now spans five desktop viewport heights (4.6 on mobile). The flavor-to-back turn ends around 37% of that span, the three back-label lines receive separate light passes through the long middle chapter, and the can rotates into the final chapter near the end. The chapter buttons jump to the new beats.
 
+The can artwork and finish were rebuilt after comparing the live product view with the reference video. Its original VYRA label now uses a larger slanted display face, a clearer ENERGY lockup, and fine flavor lettering against deeper colored lacquer. The modeled aluminum lid and base have more realistic satin surfaces and stamped rings. A separate, text-only lighting mask keeps the close-up beam on the three back-label lines even with the brighter lacquer. The bundled Racing Sans One font is distributed under the SIL Open Font License in `dist/assets/RacingSansOne-OFL.txt`.
+
 ## Performance
 
 The five can labels use 1024px color maps and 512px lighting masks. This cuts their raw texture pixels by about eight times compared with the earlier 2048px maps while preserving the visible print and spotlight. The renderer caps its pixel ratio at 1.2 on desktop and 1.1 on mobile, skips 3D rendering after the product experience leaves the viewport, and renders at up to 60 frames per second during movement and 30 when settled. Pointer parallax updates once per animation frame.

@@ -4,7 +4,7 @@ import {RectAreaLightUniformsLib} from './vendor/addons/RectAreaLightUniformsLib
 // Geometry, typography and lighting are original to VYRA. No screenshot crops.
 const state={index:0,position:0,scroll:0,motion:true,pointer:new THREE.Vector2()};
 const colors=['#6150ce','#bb155d','#b3bc35','#239d86','#c57632'];
-const lacquer=['#120e24','#220a16','#151707','#0b1b18','#211208'];
+const lacquer=['#1a1438','#320d27','#252812','#103027','#342011'];
 let renderer,scene,camera,models=[],environment,accentLight,softbox,edgeLight,ceilingLight,ambientLight,shoulderSpot,flavorSpot,active=true,last=performance.now();
 let firstFrameReady=false;
 let lastRendered=0,lastPointerMove=0;
@@ -25,17 +25,26 @@ function label(index){
   ctx.fillStyle=lacquer[index];ctx.fillRect(0,0,2048,2048);
   // The reference keeps the face almost black. Flavor color catches the curved
   // edges as narrow anodized bands; the long white streaks come from softboxes.
+  const color=new THREE.Color(colors[index]);
+  const tint=(amount)=>new THREE.Color(lacquer[index]).lerp(color,amount).getStyle();
   const edge=ctx.createLinearGradient(0,0,2048,0);
   for(const [stop,color] of [
-    [0,lacquer[index]],[.055,colors[index]],[.13,'#171018'],[.24,lacquer[index]],
-    [.36,lacquer[index]],[.47,colors[index]],[.53,lacquer[index]],[.68,lacquer[index]],
-    [.88,'#130e16'],[.98,colors[index]],[1,lacquer[index]]
+    [0,'#09080d'],[.055,tint(.75)],[.105,tint(.28)],[.18,tint(.12)],
+    [.31,tint(.31)],[.43,tint(.43)],[.52,tint(.3)],[.67,tint(.15)],
+    [.79,tint(.36)],[.92,tint(.7)],[.975,tint(.28)],[1,'#09080d']
   ]) edge.addColorStop(stop,color);
-  ctx.globalAlpha=.55;ctx.fillStyle=edge;ctx.fillRect(0,0,2048,2048);ctx.globalAlpha=1;
-  ctx.save();ctx.translate(515,1010);ctx.rotate(-Math.PI/2);ctx.fillStyle='#eeeada';ctx.textAlign='center';ctx.textBaseline='middle';
-  ctx.font='italic 460px "VYRA Display"';ctx.scale(1540/ctx.measureText('VYRA').width,1.06);ctx.fillText('VYRA',0,0);ctx.restore();
-  ctx.textAlign='center';ctx.fillStyle='#d1c7df';ctx.font='bold 74px Arial';ctx.fillText('ENERGY',515,1820);
-  ctx.font='23px Arial';ctx.fillStyle='#c7c1cf';ctx.fillText('AFTERHOURS / 250 ML',515,1900);
+  ctx.fillStyle=edge;ctx.fillRect(0,0,2048,2048);
+  // A few restrained, broad reflections live in the finish. The bright studio
+  // panels still come from the real environment map and move with the model.
+  const sheen=ctx.createLinearGradient(0,0,2048,0);
+  for(const [stop,alpha] of [[0,0],[.16,0],[.235,.09],[.27,0],[.72,0],[.78,.075],[.82,0],[1,0]])sheen.addColorStop(stop,`rgba(255,255,255,${alpha})`);
+  ctx.fillStyle=sheen;ctx.fillRect(0,0,2048,2048);
+  ctx.save();ctx.translate(515,1000);ctx.rotate(-Math.PI/2);
+  ctx.fillStyle='#f4f1e8';ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.font='570px "VYRA Can"';ctx.scale(1470/ctx.measureText('VYRA').width,1.08);ctx.fillText('VYRA',0,0);ctx.restore();
+  ctx.textAlign='center';ctx.fillStyle='#e6d8ee';ctx.font='138px "VYRA Can"';ctx.fillText('ENERGY',515,1835);
+  ctx.font='26px Arial';ctx.fillStyle='#d2c8d5';ctx.fillText('250 ML  /  AFTERHOURS',515,1905);
+  ctx.save();ctx.translate(260,1030);ctx.rotate(-Math.PI/2);ctx.fillStyle=tint(.88);ctx.font='bold 33px Arial';ctx.textAlign='center';ctx.letterSpacing='7px';ctx.fillText(['MIDNIGHT LYCHEE','RASPBERRY RUSH','CITRUS STATIC','MINT CURRENT','APRICOT AFTERGLOW'][index],0,0);ctx.restore();
   ctx.fillStyle='#d1c7df';ctx.font='italic 130px "VYRA Display"';ctx.fillText('VYRA',1540,520);
   ctx.font='34px Arial';ctx.fillText('FIND YOUR FREQUENCY',1540,635);
   const headings=['BRIGHT FLAVOR','A FRESH PERSPECTIVE','THE AFTERHOURS EDITION'];
@@ -48,19 +57,16 @@ function label(index){
   const mask=document.createElement('canvas');mask.width=mask.height=maskSize;const mc=mask.getContext('2d');
   const print=document.createElement('canvas');print.width=print.height=maskSize;const pc=print.getContext('2d');
   mc.drawImage(c,0,0,maskSize,maskSize);const pixels=mc.getImageData(0,0,maskSize,maskSize);
-  const printPixels=pc.createImageData(maskSize,maskSize);
   for(let n=0;n<pixels.data.length;n+=4){
-    const bright=Math.max(pixels.data[n],pixels.data[n+1],pixels.data[n+2]);
-    const x=(n/4)%maskSize;
-    const dx=(x-maskSize*1540/2048)/(maskSize*410/2048);
-    // Keep all three back-label lines in one texture. The shader moves a
-    // narrow light over them, so scrolling never rebuilds or uploads artwork.
-    const beam=Math.exp(-2*dx*dx);
-    const ink=x>maskSize*1150/2048&&x<maskSize*1940/2048&&bright>80?Math.round(255*beam):0;
-    printPixels.data[n]=printPixels.data[n+1]=printPixels.data[n+2]=ink;printPixels.data[n+3]=255;
-    const v=bright>160?46:215;pixels.data[n]=v;pixels.data[n+1]=v;pixels.data[n+2]=v;
+    const r=pixels.data[n],g=pixels.data[n+1],b=pixels.data[n+2];
+    const printInk=Math.max(r,g,b)>160&&Math.max(r,g,b)-Math.min(r,g,b)<38;
+    const v=printInk?75:188;pixels.data[n]=v;pixels.data[n+1]=v;pixels.data[n+2]=v;
   }
-  pc.putImageData(printPixels,0,0);
+  // The spotlight texture contains only the lettering. Inferring it from the
+  // colored lacquer caused the entire back panel to glow on bright flavors.
+  pc.fillStyle='#000';pc.fillRect(0,0,maskSize,maskSize);pc.scale(maskSize/2048,maskSize/2048);
+  pc.textAlign='center';pc.fillStyle='#fff';
+  headings.forEach((h,i)=>{pc.font='bold 40px Arial';pc.fillText(h,1540,960+i*250);pc.font='24px Arial';pc.fillText('VYRA ENERGY  /  COLLECTION 01',1540,1025+i*250);});
   mc.putImageData(pixels,0,0);const metalness=new THREE.CanvasTexture(mask);metalness.anisotropy=4;
   const emissive=new THREE.CanvasTexture(print);emissive.colorSpace=THREE.SRGBColorSpace;emissive.anisotropy=4;
   return {color:t,metalness,emissive};
@@ -79,7 +85,7 @@ function can(index){
   // Lathe's default UVs space profile points equally; labels need real height.
   for(let i=0;i<geometry.attributes.uv.count;i++)geometry.attributes.uv.setY(i,(geometry.attributes.position.getY(i)+1.75)/3.44);
   const artwork=label(index);
-  const material=new THREE.MeshPhysicalMaterial({map:artwork.color,metalnessMap:artwork.metalness,metalness:1,roughness:.31,clearcoat:.92,clearcoatRoughness:.16,envMapIntensity:1.05,bumpMap:brushed,bumpScale:.0007,emissive:new THREE.Color(colors[index]),emissiveMap:artwork.emissive,emissiveIntensity:0});
+  const material=new THREE.MeshPhysicalMaterial({map:artwork.color,metalnessMap:artwork.metalness,metalness:.88,roughness:.24,clearcoat:1,clearcoatRoughness:.11,envMapIntensity:1.45,bumpMap:brushed,bumpScale:.00045,emissive:new THREE.Color(colors[index]),emissiveMap:artwork.emissive,emissiveIntensity:0});
   const textLightY={value:1-1000/2048};
   material.onBeforeCompile=shader=>{
     shader.uniforms.textLightY=textLightY;
@@ -89,26 +95,29 @@ function can(index){
     shader.fragmentShader=shader.fragmentShader.replace('void main() {','uniform float textLightY;\nvoid main() {');
   };
   g.add(new THREE.Mesh(geometry,material));
-  const metal=new THREE.MeshPhysicalMaterial({color:'#d7d9d8',metalness:1,roughness:.27,envMapIntensity:1.5,bumpMap:brushed,bumpScale:.0015});
+  const metal=new THREE.MeshPhysicalMaterial({color:'#aeb5b9',metalness:.69,roughness:.29,clearcoat:.48,clearcoatRoughness:.17,envMapIntensity:1.75,bumpMap:brushed,bumpScale:.0007});
+  const satinMetal=new THREE.MeshStandardMaterial({color:'#9aa0a3',metalness:.43,roughness:.38,envMapIntensity:1.35,bumpMap:brushed,bumpScale:.00045});
   const lid=new THREE.Group();
-  const disk=new THREE.Mesh(new THREE.CylinderGeometry(.434,.434,.025,80),metal);lid.add(disk);
+  const disk=new THREE.Mesh(new THREE.CylinderGeometry(.434,.434,.025,80),satinMetal);lid.add(disk);
   const rim=new THREE.Mesh(new THREE.TorusGeometry(.443,.027,12,96),metal);rim.rotation.x=Math.PI/2;rim.position.y=.018;lid.add(rim);
   const inset=new THREE.Mesh(new THREE.TorusGeometry(.36,.009,8,80),metal);inset.rotation.x=Math.PI/2;inset.position.y=.025;lid.add(inset);
   const tabShape=new THREE.Shape();tabShape.moveTo(-.095,-.13);tabShape.bezierCurveTo(-.145,-.05,-.135,.15,-.06,.21);tabShape.bezierCurveTo(-.02,.24,.06,.23,.09,.18);tabShape.bezierCurveTo(.14,.09,.14,-.06,.095,-.13);tabShape.quadraticCurveTo(0,-.19,-.095,-.13);
   const hole=new THREE.Path();hole.absellipse(0,.06,.067,.11,0,Math.PI*2,true);tabShape.holes.push(hole);
   const tab=new THREE.Mesh(new THREE.ExtrudeGeometry(tabShape,{depth:.015,bevelEnabled:true,bevelSize:.005,bevelThickness:.004,bevelSegments:2,steps:1,curveSegments:16}),metal);tab.rotation.x=-Math.PI/2;tab.position.set(0,.05,.04);lid.add(tab);
+  const score=new THREE.Mesh(new THREE.RingGeometry(.255,.26,64),new THREE.MeshBasicMaterial({color:'#596065',side:THREE.DoubleSide}));score.rotation.x=-Math.PI/2;score.position.y=.029;score.scale.y=1.12;lid.add(score);
   const rivet=new THREE.Mesh(new THREE.SphereGeometry(.033,16,8),metal);rivet.scale.y=.3;rivet.position.set(0,.065,.16);lid.add(rivet);
   const opening=new THREE.Mesh(new THREE.RingGeometry(.092,.105,48),new THREE.MeshStandardMaterial({color:'#707276',metalness:.9,roughness:.4}));opening.rotation.x=-Math.PI/2;opening.scale.y=1.45;opening.position.set(0,.022,-.2);lid.add(opening);
-  const recessed=new THREE.Mesh(new THREE.CylinderGeometry(.345,.345,.008,64),metal);recessed.position.y=.018;lid.add(recessed);
+  const recessed=new THREE.Mesh(new THREE.CylinderGeometry(.345,.345,.008,64),satinMetal);recessed.position.y=.018;lid.add(recessed);
   lid.position.y=1.71;g.add(lid);
   // A dark well and a rolled rim remain on the can when the real lid lifts.
   const openingWell=new THREE.Mesh(new THREE.CylinderGeometry(.395,.395,.012,80),new THREE.MeshPhysicalMaterial({color:'#07080a',metalness:.72,roughness:.48}));openingWell.position.y=1.672;g.add(openingWell);
   const mouthRim=new THREE.Mesh(new THREE.TorusGeometry(.426,.014,8,96),metal);mouthRim.rotation.x=Math.PI/2;mouthRim.position.y=1.68;g.add(mouthRim);
   const base=new THREE.Mesh(new THREE.TorusGeometry(.423,.027,12,96),metal);base.rotation.x=Math.PI/2;base.position.y=-1.73;g.add(base);
   const bottom=new THREE.Group();
-  const foot=new THREE.Mesh(new THREE.CylinderGeometry(.414,.414,.032,80),metal);bottom.add(foot);
+  const foot=new THREE.Mesh(new THREE.CylinderGeometry(.414,.414,.032,80),satinMetal);bottom.add(foot);
   const footRing=new THREE.Mesh(new THREE.TorusGeometry(.413,.018,10,96),metal);footRing.rotation.x=Math.PI/2;footRing.position.y=.018;bottom.add(footRing);
-  const footInset=new THREE.Mesh(new THREE.CircleGeometry(.32,80),new THREE.MeshPhysicalMaterial({color:'#57575c',metalness:.9,roughness:.35}));footInset.rotation.x=-Math.PI/2;footInset.position.y=.019;bottom.add(footInset);
+  const footInset=new THREE.Mesh(new THREE.CircleGeometry(.32,80),new THREE.MeshStandardMaterial({color:'#858c90',metalness:.38,roughness:.43,envMapIntensity:1.2}));footInset.rotation.x=-Math.PI/2;footInset.position.y=.019;bottom.add(footInset);
+  const footGroove=new THREE.Mesh(new THREE.TorusGeometry(.29,.006,6,80),new THREE.MeshBasicMaterial({color:'#50565a'}));footGroove.rotation.x=Math.PI/2;footGroove.position.y=.024;bottom.add(footGroove);
   bottom.position.y=-1.73;g.add(bottom);
   g.userData={index,material,lid,bottom,textLightY};return g;
 }
@@ -173,9 +182,9 @@ function draw(now){
   edgeLight.intensity=7*(1-focusWindow*.94);
   ceilingLight.intensity=3.5*(1-focusWindow*.96);
   ambientLight.intensity=.3*(1-focusWindow*.9);
-  accentLight.intensity=3.5*(1-focusWindow*.84);
+  accentLight.intensity=2.8*(1-focusWindow*.8);
   shoulderSpot.intensity=18*(1-focusWindow*.96);
-  flavorSpot.intensity=33*(1-focusWindow*.15);
+  flavorSpot.intensity=22*(1-focusWindow);
   flavorSpot.angle=THREE.MathUtils.lerp(.34,.17,focusWindow);
   models.forEach((m,i)=>{
     let offset=i-state.position;offset=((offset+2.5)%5+5)%5-2.5;
@@ -230,7 +239,7 @@ try{
   await nextPaint();
   renderer=new THREE.WebGLRenderer({canvas,alpha:true,antialias:true,powerPreference:'high-performance'});renderer.setClearColor(0,0);renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.3;
   scene=new THREE.Scene();camera=new THREE.PerspectiveCamera(31,1,.1,50);camera.position.set(0,0,11);await nextPaint();lighting();
-  await document.fonts.load('400 40px "VYRA Display"');
+  await Promise.all([document.fonts.load('400 40px "VYRA Display"'),document.fonts.load('400 40px "VYRA Can"')]);
   for(let i=0;i<colors.length;i++){const m=can(i);scene.add(m);models.push(m);await nextPaint();}
   resize();addEventListener('resize',resize);
   // A restored scroll position must start on the matching product face.

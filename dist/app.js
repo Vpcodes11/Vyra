@@ -83,6 +83,8 @@ function updateScroll(){
   framePending=false;
   const rect=experience.getBoundingClientRect(),range=Math.max(1,experience.offsetHeight-innerHeight);
   const progress=Math.min(1,Math.max(0,-rect.top/range));
+  const heroExit=Math.min(1,Math.max(0,(innerHeight-rect.top)/(innerHeight*.24)));
+  const collection=$('#collection');collection.style.setProperty('--hero-exit',heroExit.toFixed(3));collection.classList.toggle('hero-exiting',heroExit>.94);
   const next=progress<.32?0:progress<.88?1:2;
   if(chapter!==next){chapter=next;document.querySelectorAll('.copy-panel').forEach((el,i)=>{el.classList.toggle('active',i===chapter);el.inert=i!==chapter;});
     document.querySelectorAll('[data-go]').forEach((el,i)=>{if(i===chapter)el.setAttribute('aria-current','step');else el.removeAttribute('aria-current');});$('#chapter-count').textContent='0'+(chapter+1)+' / 03';}
