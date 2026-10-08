@@ -13,7 +13,7 @@ const row = $('#can-row');
 const experience = $('#experience');
 const motionQuery = matchMedia('(prefers-reduced-motion: reduce)');
 let selected = 0, chapter = -1, reduced = motionQuery.matches, framePending = false;
-let drag = null;
+let drag = null; let visualIndex = 0;
 try { const saved = localStorage.getItem('vyra-reduced-motion'); if(saved !== null) reduced = saved === 'true'; } catch {}
 
 // Seven positions keep the ends filled while the five flavors wrap naturally.
@@ -31,8 +31,8 @@ flavors.forEach((flavor,i) => {
 function wrap(n){return (n+flavors.length)%flavors.length;}
 function selectFlavor(index){
   const previous=selected;selected=wrap(index); const f=flavors[selected];
-  const direction=index===previous?0:(index>previous?1:-1);
-  root.style.setProperty('--accent',f.color);root.style.setProperty('--rgb',f.rgb);root.style.setProperty('--hue',f.hue+'deg');
+  let step=selected-previous; if(step>2)step-=5; if(step< -2)step+=5; visualIndex+=step; window.vyra3d?.select(visualIndex);
+  root.style.setProperty('--accent',f.color);root.style.setProperty('--light-color',f.color);root.style.setProperty('--rgb',f.rgb);root.style.setProperty('--hue',f.hue+'deg');
   $('#flavor-number').textContent=String(selected+1).padStart(2,'0')+' / 05';
   for(const id of ['#flavor-name','#detail-title']) $(id).innerHTML=f.lines.join('<br>');
   $('#detail-description').textContent=f.description;$('#detail-flavor').textContent=f.name;
@@ -49,10 +49,6 @@ function selectFlavor(index){
     const image=el.querySelector('img');const back=!active&&Math.abs(slot)%2===1;
     image.src=back?'assets/can-back.webp':'assets/can-front.webp';
     if(back)el.style.setProperty('--can-hue',(flavors[fi].hue-50)+'deg');
-    if(direction&&!reduced){el.getAnimations().forEach(a=>a.cancel());el.animate([
-      {transform:`translate(-50%,-50%) translateX(${(slot+direction)*gap}px) rotate(${slot===0?-5:-3}deg) scale(.86)`},
-      {transform:`translate(-50%,-50%) translateX(${slot*gap}px) rotate(${active?-16:slot<0?-5:5}deg) scale(${active?1.13:.86-Math.abs(slot)*.025})`}
-    ],{duration:850,easing:'cubic-bezier(.2,.75,.2,1)'});}
     el.setAttribute('aria-label',flavors[fi].name+(active?', selected':''));el.setAttribute('aria-pressed',String(active));
     el.tabIndex=Math.abs(slot)>2?-1:0;
   });
@@ -73,7 +69,7 @@ $('#collection').addEventListener('pointermove',e=>{
   root.style.setProperty('--px',((e.clientX/innerWidth-.5)*12).toFixed(1)+'px');root.style.setProperty('--py',((e.clientY/innerHeight-.5)*8).toFixed(1)+'px');
 });
 $('#collection').addEventListener('pointerleave',()=>{root.style.setProperty('--px','0px');root.style.setProperty('--py','0px');});
-function applyMotion(){root.classList.toggle('reduced-motion',reduced);root.style.scrollBehavior=reduced?'auto':'';$('#motion-toggle').innerHTML='MOTION '+(reduced?'OFF':'ON')+' <span>◉</span>';$('#motion-toggle').setAttribute('aria-pressed',String(reduced));updateScroll();}
+function applyMotion(){window.vyra3d?.motion(!reduced);root.classList.toggle('reduced-motion',reduced);root.style.scrollBehavior=reduced?'auto':'';$('#motion-toggle').innerHTML='MOTION '+(reduced?'OFF':'ON')+' <span>◉</span>';$('#motion-toggle').setAttribute('aria-pressed',String(reduced));updateScroll();}
 $('#motion-toggle').addEventListener('click',()=>{reduced=!reduced;try{localStorage.setItem('vyra-reduced-motion',String(reduced));}catch{}applyMotion();});
 motionQuery.addEventListener('change',e=>{reduced=e.matches;applyMotion();});
 function updateScroll(){
@@ -104,4 +100,7 @@ menu.querySelectorAll('a').forEach(a=>a.addEventListener('click',closeMenu));
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!menu.hidden){closeMenu();menuButton.focus();}});
 document.addEventListener('click',e=>{if(!menu.hidden&&!menu.contains(e.target)&&!menuButton.contains(e.target))closeMenu();});
 $('#year').textContent=new Date().getFullYear();selectFlavor(0);applyMotion();
+
+
+addEventListener("vyra3dready",()=>{window.vyra3d.select(visualIndex);window.vyra3d.motion(!reduced);});
 
