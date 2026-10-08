@@ -1,10 +1,10 @@
 'use strict';
 const flavors = [
-  {name:'MIDNIGHT LYCHEE',lines:['MIDNIGHT','LYCHEE'],color:'#b49aff',rgb:'143,97,255',hue:0,notes:['FLORAL','BRIGHT','CRISP'],description:'Soft lychee. A flash of citrus. A bright, sparkling finish that takes the night somewhere new.'},
-  {name:'RASPBERRY RUSH',lines:['RASPBERRY','RUSH'],color:'#ff7bb7',rgb:'241,16,110',hue:55,notes:['BERRY','TART','ELECTRIC'],description:'A burst of raspberry with a sharp, juicy edge. Bold from the first sip, bright to the very last.'},
-  {name:'CITRUS STATIC',lines:['CITRUS','STATIC'],color:'#dded8b',rgb:'184,196,39',hue:185,notes:['ZESTY','SHARP','VIVID'],description:'Lemon and lime in perfect tension. A wave of citrus with a sparkling, dry finish.'},
-  {name:'MINT CURRENT',lines:['MINT','CURRENT'],color:'#75e2c3',rgb:'18,182,137',hue:250,notes:['COOL','FRESH','CLEAN'],description:'Cool mint meets a quiet hint of cucumber. A fresh current running through every sparkling sip.'},
-  {name:'APRICOT AFTERGLOW',lines:['APRICOT','AFTERGLOW'],color:'#ffc482',rgb:'230,119,36',hue:125,notes:['MELLOW','JUICY','GOLDEN'],description:'Sun-ripe apricot with a little citrus lift. Soft stone fruit, a bright sparkle, and a golden finish.'}
+  {glow:'#5435c8',name:'MIDNIGHT LYCHEE',lines:['MIDNIGHT','LYCHEE'],color:'#b49aff',rgb:'143,97,255',hue:0,notes:['FLORAL','BRIGHT','CRISP'],description:'Soft lychee. A flash of citrus. A bright, sparkling finish that takes the night somewhere new.'},
+  {glow:'#e5005e',name:'RASPBERRY RUSH',lines:['RASPBERRY','RUSH'],color:'#ff7bb7',rgb:'241,16,110',hue:55,notes:['BERRY','TART','ELECTRIC'],description:'A burst of raspberry with a sharp, juicy edge. Bold from the first sip, bright to the very last.'},
+  {glow:'#9da622',name:'CITRUS STATIC',lines:['CITRUS','STATIC'],color:'#dded8b',rgb:'184,196,39',hue:185,notes:['ZESTY','SHARP','VIVID'],description:'Lemon and lime in perfect tension. A wave of citrus with a sparkling, dry finish.'},
+  {glow:'#009e82',name:'MINT CURRENT',lines:['MINT','CURRENT'],color:'#75e2c3',rgb:'18,182,137',hue:250,notes:['COOL','FRESH','CLEAN'],description:'Cool mint meets a quiet hint of cucumber. A fresh current running through every sparkling sip.'},
+  {glow:'#d76826',name:'APRICOT AFTERGLOW',lines:['APRICOT','AFTERGLOW'],color:'#ffc482',rgb:'230,119,36',hue:125,notes:['MELLOW','JUICY','GOLDEN'],description:'Sun-ripe apricot with a little citrus lift. Soft stone fruit, a bright sparkle, and a golden finish.'}
 ];
 const $ = s => document.querySelector(s);
 const root = document.documentElement;
@@ -32,7 +32,7 @@ function wrap(n){return (n+flavors.length)%flavors.length;}
 function selectFlavor(index){
   const previous=selected;selected=wrap(index); const f=flavors[selected];
   let step=selected-previous; if(step>2)step-=5; if(step< -2)step+=5; visualIndex+=step; window.vyra3d?.select(visualIndex);
-  root.style.setProperty('--accent',f.color);root.style.setProperty('--light-color',f.color);root.style.setProperty('--rgb',f.rgb);root.style.setProperty('--hue',f.hue+'deg');
+  root.style.setProperty('--accent',f.color);root.style.setProperty('--light-color',f.glow);root.style.setProperty('--rgb',f.rgb);root.style.setProperty('--hue',f.hue+'deg');
   $('#flavor-number').textContent=String(selected+1).padStart(2,'0')+' / 05';
   for(const id of ['#flavor-name','#detail-title']) $(id).innerHTML=f.lines.join('<br>');
   $('#detail-description').textContent=f.description;$('#detail-flavor').textContent=f.name;

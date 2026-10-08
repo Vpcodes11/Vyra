@@ -4,15 +4,23 @@ import {RectAreaLightUniformsLib} from './vendor/addons/RectAreaLightUniformsLib
 // Geometry, typography and lighting are original to VYRA. No screenshot crops.
 const state={index:0,position:0,scroll:0,motion:true,pointer:new THREE.Vector2()};
 const colors=['#6150ce','#bb155d','#b3bc35','#239d86','#c57632'];
+const lacquer=['#120e24','#220a16','#151707','#0b1b18','#211208'];
 let renderer,scene,camera,models=[],environment,accentLight,softbox,active=true,last=performance.now();
 const canvas=document.createElement('canvas');canvas.className='product-canvas';canvas.setAttribute('aria-hidden','true');
 document.body.append(canvas);
 
 function label(index){
   const c=document.createElement('canvas');c.width=2048;c.height=2048;const ctx=c.getContext('2d');
-  ctx.fillStyle='#16121c';ctx.fillRect(0,0,c.width,c.height);
-  // A subtle satin finish; all reflections are calculated by the renderer.
-  ctx.fillStyle=colors[index];ctx.globalAlpha=.7;ctx.fillRect(0,0,c.width,c.height);ctx.globalAlpha=1;
+  ctx.fillStyle=lacquer[index];ctx.fillRect(0,0,c.width,c.height);
+  // The reference keeps the face almost black. Flavor color catches the curved
+  // edges as narrow anodized bands; the long white streaks come from softboxes.
+  const edge=ctx.createLinearGradient(0,0,2048,0);
+  for(const [stop,color] of [
+    [0,lacquer[index]],[.055,colors[index]],[.13,'#171018'],[.24,lacquer[index]],
+    [.36,lacquer[index]],[.47,colors[index]],[.53,lacquer[index]],[.68,lacquer[index]],
+    [.88,'#130e16'],[.98,colors[index]],[1,lacquer[index]]
+  ]) edge.addColorStop(stop,color);
+  ctx.globalAlpha=.55;ctx.fillStyle=edge;ctx.fillRect(0,0,c.width,c.height);ctx.globalAlpha=1;
   ctx.save();ctx.translate(515,1010);ctx.rotate(-Math.PI/2);ctx.fillStyle='#eeeada';ctx.textAlign='center';ctx.textBaseline='middle';
   ctx.font='italic 460px "VYRA Display"';ctx.scale(1540/ctx.measureText('VYRA').width,1.06);ctx.fillText('VYRA',0,0);ctx.restore();
   ctx.textAlign='center';ctx.fillStyle='#d1c7df';ctx.font='bold 74px Arial';ctx.fillText('ENERGY',515,1820);
@@ -46,7 +54,7 @@ function can(index){
   // Lathe's default UVs space profile points equally; labels need real height.
   for(let i=0;i<geometry.attributes.uv.count;i++)geometry.attributes.uv.setY(i,(geometry.attributes.position.getY(i)+1.75)/3.44);
   const artwork=label(index);
-  const material=new THREE.MeshPhysicalMaterial({map:artwork.color,metalnessMap:artwork.metalness,metalness:1,roughness:.29,clearcoat:1,clearcoatRoughness:.12,envMapIntensity:1.2,bumpMap:brushed,bumpScale:.0007});
+  const material=new THREE.MeshPhysicalMaterial({map:artwork.color,metalnessMap:artwork.metalness,metalness:1,roughness:.31,clearcoat:.92,clearcoatRoughness:.16,envMapIntensity:1.05,bumpMap:brushed,bumpScale:.0007});
   g.add(new THREE.Mesh(geometry,material));
   const metal=new THREE.MeshPhysicalMaterial({color:'#d7d9d8',metalness:1,roughness:.27,envMapIntensity:1.5,bumpMap:brushed,bumpScale:.0015});
   const lid=new THREE.Group();
@@ -67,13 +75,13 @@ function can(index){
 function lighting(){
   const room=new THREE.Scene();room.background=new THREE.Color('#08080b');
   const box=(x,y,z,w,h,color,intensity,ry=0)=>{const m=new THREE.Mesh(new THREE.PlaneGeometry(w,h),new THREE.MeshBasicMaterial({color:new THREE.Color(color).multiplyScalar(intensity),side:THREE.DoubleSide}));m.position.set(x,y,z);m.rotation.y=ry;room.add(m);};
-  box(-4,1,4,2.7,8,'#fff7ec',4,.75);box(5,.5,1,.6,8,'#ffffff',7,-.9);box(0,5,2,8,3,'#ffffff',3);box(0,-3,4,7,2,'#a6a0a6',.75);
+  box(-4,1,4,1.8,8,'#fff7ec',5.5,.75);box(5,.5,1,.42,9,'#ffffff',6,-.9);box(0,5,2,7,2,'#ffffff',2.5);box(0,-3,4,6,1.5,'#a6a0a6',.6);
   const pmrem=new THREE.PMREMGenerator(renderer);environment=pmrem.fromScene(room,.08);scene.environment=environment.texture;pmrem.dispose();
   RectAreaLightUniformsLib.init();scene.add(new THREE.AmbientLight('#e7e4e6',.3));
-  softbox=new THREE.RectAreaLight('#fff8ef',4.5,4,7);softbox.position.set(-3,2.8,5);softbox.lookAt(0,0,0);scene.add(softbox);
-  const edge=new THREE.RectAreaLight('#ffffff',9,.65,6);edge.position.set(3,.6,-1);edge.lookAt(0,0,0);scene.add(edge);
-  const ceiling=new THREE.RectAreaLight('#ffffff',4,5,2);ceiling.position.set(0,4.5,2);ceiling.lookAt(0,0,0);scene.add(ceiling);
-  accentLight=new THREE.RectAreaLight(colors[0],5,3,5);accentLight.position.set(-2,-.5,2);accentLight.lookAt(0,0,0);scene.add(accentLight);
+  softbox=new THREE.RectAreaLight('#fff8ef',4.5,2.5,7);softbox.position.set(-3,2.8,5);softbox.lookAt(0,0,0);scene.add(softbox);
+  const edge=new THREE.RectAreaLight('#ffffff',7,.42,7);edge.position.set(3,.6,-1);edge.lookAt(0,0,0);scene.add(edge);
+  const ceiling=new THREE.RectAreaLight('#ffffff',3.5,5,1.2);ceiling.position.set(0,4.5,2);ceiling.lookAt(0,0,0);scene.add(ceiling);
+  accentLight=new THREE.RectAreaLight(colors[0],3.5,1.1,7);accentLight.position.set(-2,-.5,2);accentLight.lookAt(0,0,0);scene.add(accentLight);
 }
 function resize(){const w=innerWidth,h=innerHeight;renderer.setSize(w,h,false);renderer.setPixelRatio(Math.min(devicePixelRatio,w<760?1.5:1.75));camera.aspect=w/h;camera.updateProjectionMatrix();}
 const smooth=(x)=>{x=THREE.MathUtils.clamp(x,0,1);return x*x*(3-2*x);};
