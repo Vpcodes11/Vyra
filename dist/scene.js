@@ -5,7 +5,7 @@ import {RectAreaLightUniformsLib} from './vendor/addons/RectAreaLightUniformsLib
 const state={index:0,position:0,scroll:0,motion:true,pointer:new THREE.Vector2()};
 const colors=['#6150ce','#bb155d','#b3bc35','#239d86','#c57632'];
 const lacquer=['#120e24','#220a16','#151707','#0b1b18','#211208'];
-let renderer,scene,camera,models=[],environment,accentLight,softbox,shoulderSpot,flavorSpot,active=true,last=performance.now();
+let renderer,scene,camera,models=[],environment,accentLight,softbox,edgeLight,ceilingLight,ambientLight,shoulderSpot,flavorSpot,active=true,last=performance.now();
 const canvas=document.createElement('canvas');canvas.className='product-canvas';canvas.setAttribute('aria-hidden','true');
 document.body.append(canvas);
 const experience=document.querySelector('#experience'),sticky=document.querySelector('.experience-sticky');
@@ -18,7 +18,7 @@ function label(index){
   const size=1024,maskSize=512;
   const c=document.createElement('canvas');c.width=c.height=size;const ctx=c.getContext('2d');
   ctx.scale(size/2048,size/2048);
-  ctx.fillStyle=lacquer[index];ctx.fillRect(0,0,c.width,c.height);
+  ctx.fillStyle=lacquer[index];ctx.fillRect(0,0,2048,2048);
   // The reference keeps the face almost black. Flavor color catches the curved
   // edges as narrow anodized bands; the long white streaks come from softboxes.
   const edge=ctx.createLinearGradient(0,0,2048,0);
@@ -27,7 +27,7 @@ function label(index){
     [.36,lacquer[index]],[.47,colors[index]],[.53,lacquer[index]],[.68,lacquer[index]],
     [.88,'#130e16'],[.98,colors[index]],[1,lacquer[index]]
   ]) edge.addColorStop(stop,color);
-  ctx.globalAlpha=.55;ctx.fillStyle=edge;ctx.fillRect(0,0,c.width,c.height);ctx.globalAlpha=1;
+  ctx.globalAlpha=.55;ctx.fillStyle=edge;ctx.fillRect(0,0,2048,2048);ctx.globalAlpha=1;
   ctx.save();ctx.translate(515,1010);ctx.rotate(-Math.PI/2);ctx.fillStyle='#eeeada';ctx.textAlign='center';ctx.textBaseline='middle';
   ctx.font='italic 460px "VYRA Display"';ctx.scale(1540/ctx.measureText('VYRA').width,1.06);ctx.fillText('VYRA',0,0);ctx.restore();
   ctx.textAlign='center';ctx.fillStyle='#d1c7df';ctx.font='bold 74px Arial';ctx.fillText('ENERGY',515,1820);
@@ -47,8 +47,13 @@ function label(index){
   const printPixels=pc.createImageData(maskSize,maskSize);
   for(let n=0;n<pixels.data.length;n+=4){
     const bright=Math.max(pixels.data[n],pixels.data[n+1],pixels.data[n+2]);
-    const x=(n/4)%maskSize;
-    const ink=x>maskSize*1150/2048&&x<maskSize*1940/2048&&bright>80?255:0;
+    const x=(n/4)%maskSize,y=Math.floor(n/4/maskSize);
+    const dx=(x-maskSize*1540/2048)/(maskSize*410/2048);
+    const dy=(y-maskSize*1000/2048)/(maskSize*235/2048);
+    // A small pool of light catches one back-label paragraph. The rest of
+    // the print receives no emissive light when the room goes dark.
+    const beam=Math.exp(-2*(dx*dx+dy*dy));
+    const ink=x>maskSize*1150/2048&&x<maskSize*1940/2048&&bright>80?Math.round(255*beam):0;
     printPixels.data[n]=printPixels.data[n+1]=printPixels.data[n+2]=ink;printPixels.data[n+3]=255;
     const v=bright>160?46:215;pixels.data[n]=v;pixels.data[n+1]=v;pixels.data[n+2]=v;
   }
@@ -101,10 +106,10 @@ function lighting(){
   const box=(x,y,z,w,h,color,intensity,ry=0)=>{const m=new THREE.Mesh(new THREE.PlaneGeometry(w,h),new THREE.MeshBasicMaterial({color:new THREE.Color(color).multiplyScalar(intensity),side:THREE.DoubleSide}));m.position.set(x,y,z);m.rotation.y=ry;room.add(m);};
   box(-4,1,4,1.8,8,'#fff7ec',5.5,.75);box(5,.5,1,.42,9,'#ffffff',6,-.9);box(0,5,2,7,2,'#ffffff',2.5);box(0,-3,4,6,1.5,'#a6a0a6',.6);
   const pmrem=new THREE.PMREMGenerator(renderer);environment=pmrem.fromScene(room,.035);scene.environment=environment.texture;pmrem.dispose();
-  RectAreaLightUniformsLib.init();scene.add(new THREE.AmbientLight('#e7e4e6',.3));
+  RectAreaLightUniformsLib.init();ambientLight=new THREE.AmbientLight('#e7e4e6',.3);scene.add(ambientLight);
   softbox=new THREE.RectAreaLight('#fff8ef',4.5,2.5,7);softbox.position.set(-3,2.8,5);softbox.lookAt(0,0,0);scene.add(softbox);
-  const edge=new THREE.RectAreaLight('#ffffff',7,.42,7);edge.position.set(3,.6,-1);edge.lookAt(0,0,0);scene.add(edge);
-  const ceiling=new THREE.RectAreaLight('#ffffff',3.5,5,1.2);ceiling.position.set(0,4.5,2);ceiling.lookAt(0,0,0);scene.add(ceiling);
+  edgeLight=new THREE.RectAreaLight('#ffffff',7,.42,7);edgeLight.position.set(3,.6,-1);edgeLight.lookAt(0,0,0);scene.add(edgeLight);
+  ceilingLight=new THREE.RectAreaLight('#ffffff',3.5,5,1.2);ceilingLight.position.set(0,4.5,2);ceilingLight.lookAt(0,0,0);scene.add(ceilingLight);
   accentLight=new THREE.RectAreaLight(colors[0],3.5,1.1,7);accentLight.position.set(-2,-.5,2);accentLight.lookAt(0,0,0);scene.add(accentLight);
   shoulderSpot=new THREE.SpotLight('#fff5ed',18,5,.31,.95,1.5);
   flavorSpot=new THREE.SpotLight(colors[0],33,5,.34,.95,1.5);
@@ -129,11 +134,11 @@ function draw(now){
   const target=THREE.MathUtils.clamp(-rect.top/(experience.offsetHeight-innerHeight),0,1);
   state.scroll+=(target-state.scroll)*(state.motion?1-Math.exp(-dt*9):1);
   const mobile=innerWidth<=760,H=innerHeight;
-  const focusWindow=smooth((state.scroll-.28)/.10)*(1-smooth((state.scroll-.59)/.12));
+  const focusWindow=smooth((state.scroll-.27)/.10)*(1-smooth((state.scroll-.60)/.12));
   const lateZoom=smooth((state.scroll-.7)/.2);
   const focusStyle=focusWindow.toFixed(3);
   if(focusStyle!==lastFocusStyle){
-    sticky.style.setProperty('--detail-brightness',(1-focusWindow*.87).toFixed(3));
+    sticky.style.setProperty('--detail-brightness',(1-focusWindow*.48).toFixed(3));
     sticky.style.setProperty('--focus-dim',focusStyle);
     lastFocusStyle=focusStyle;
   }
@@ -142,6 +147,16 @@ function draw(now){
   const visibleHeight=2*Math.tan(THREE.MathUtils.degToRad(camera.fov/2))*camera.position.z;
   const vw=visibleHeight*camera.aspect;
   const bob=state.motion?Math.sin(now*.0008)*.045:0;
+  // The reference closes the studio softboxes for a single focused beat,
+  // leaving just a tight flavor-colored beam on the back print.
+  softbox.intensity=4.5*(1-focusWindow*.96);
+  edgeLight.intensity=7*(1-focusWindow*.94);
+  ceilingLight.intensity=3.5*(1-focusWindow*.96);
+  ambientLight.intensity=.3*(1-focusWindow*.9);
+  accentLight.intensity=3.5*(1-focusWindow*.84);
+  shoulderSpot.intensity=18*(1-focusWindow*.96);
+  flavorSpot.intensity=33*(1-focusWindow*.15);
+  flavorSpot.angle=THREE.MathUtils.lerp(.34,.17,focusWindow);
   models.forEach((m,i)=>{
     let offset=i-state.position;offset=((offset+2.5)%5+5)%5-2.5;
     const focus=1-smooth(Math.abs(offset));const selected=i===((Math.round(state.index)%5)+5)%5;
@@ -163,10 +178,10 @@ function draw(now){
     const rotation=state.motion?state.scroll*Math.PI*2:(Math.floor(target*3)===1?Math.PI:0);
     m.rotation.set(.08,THREE.MathUtils.lerp((1-focus)*Math.PI*.92,rotation,t)+state.pointer.x*.055*focus-velocity*.1,THREE.MathUtils.lerp(.24*focus+Math.sin(i*1.9)*.065*(1-focus),-.1+Math.cos(state.scroll*Math.PI*2)*.34-lateZoom*.55,t)+state.pointer.y*.025*focus+velocity*.025);
     // The selected object and its reflections move as a single continuous model.
-    m.userData.material.envMapIntensity=(.2+focus*.95+enter*.25)*(1-focusWindow*.72);
-    m.userData.material.color.setScalar(.25+focus*.75-(selected?focusWindow*.6:0));
+    m.userData.material.envMapIntensity=(.2+focus*.95+enter*.25)*(1-focusWindow*.91);
+    m.userData.material.color.setScalar(.25+focus*.75-(selected?focusWindow*.78:0));
     m.userData.material.clearcoat=.3+focus*.65;
-    m.userData.material.emissiveIntensity=selected?focusWindow*2.2:0;
+    m.userData.material.emissiveIntensity=selected?focusWindow*3.7:0;
     const explode=focus*(1-enter);
     m.userData.lid.position.y=1.71+.49*explode;
     m.userData.lid.rotation.x=.55*explode;
@@ -177,8 +192,8 @@ function draw(now){
   const lightDamping=state.motion?1-Math.exp(-dt*5):1;
   follow(shoulderSpot.position,focusModel.position.x-s*1.7+state.pointer.x*.18,focusModel.position.y+s*1.4+state.pointer.y*.12,focusModel.position.z+2.7,lightDamping);
   follow(shoulderSpot.target.position,focusModel.position.x,focusModel.position.y+s*.85,focusModel.position.z,lightDamping);
-  follow(flavorSpot.position,focusModel.position.x+s*(1.6-focusWindow*.8)-state.pointer.x*.24,focusModel.position.y+s*(-.75+focusWindow*1.2)+state.pointer.y*.1,focusModel.position.z+2.4,lightDamping);
-  follow(flavorSpot.target.position,focusModel.position.x,focusModel.position.y+s*(-.7+focusWindow*.95),focusModel.position.z,lightDamping);
+  follow(flavorSpot.position,focusModel.position.x+s*(1.6-focusWindow*1.05)-state.pointer.x*.24,focusModel.position.y+s*(-.75+focusWindow*.95)+state.pointer.y*.1,focusModel.position.z+2.4,lightDamping);
+  follow(flavorSpot.target.position,focusModel.position.x,focusModel.position.y+s*(-.7+focusWindow*.88),focusModel.position.z,lightDamping);
   renderer.render(scene,camera);
   window.vyra3d.stats={calls:renderer.info.render.calls,triangles:renderer.info.render.triangles};
 }
