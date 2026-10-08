@@ -6,10 +6,14 @@ const state={index:0,position:0,scroll:0,motion:true,pointer:new THREE.Vector2()
 const colors=['#6150ce','#bb155d','#b3bc35','#239d86','#c57632'];
 const lacquer=['#120e24','#220a16','#151707','#0b1b18','#211208'];
 let renderer,scene,camera,models=[],environment,accentLight,softbox,edgeLight,ceilingLight,ambientLight,shoulderSpot,flavorSpot,active=true,last=performance.now();
+let firstFrameReady=false;
+let lastRendered=0,lastPointerMove=0;
 const canvas=document.createElement('canvas');canvas.className='product-canvas';canvas.setAttribute('aria-hidden','true');
+canvas.style.opacity='0';
 document.body.append(canvas);
 const experience=document.querySelector('#experience'),sticky=document.querySelector('.experience-sticky');
 let lastFocusStyle='';
+const nextPaint=()=>new Promise(resolve=>requestAnimationFrame(()=>setTimeout(resolve,0)));
 
 function label(index){
   // The artwork is displayed at under 800 CSS pixels even in the close-up.
@@ -122,13 +126,18 @@ function lighting(){
   flavorSpot=new THREE.SpotLight(colors[0],33,5,.34,.95,1.5);
   scene.add(shoulderSpot,shoulderSpot.target,flavorSpot,flavorSpot.target);
 }
-function resize(){const w=innerWidth,h=innerHeight;renderer.setPixelRatio(Math.min(devicePixelRatio,w<760?1.2:1.4));renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();}
+function resize(){const w=innerWidth,h=innerHeight;renderer.setPixelRatio(Math.min(devicePixelRatio,w<760?1.1:1.2));renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();}
 const smooth=(x)=>{x=THREE.MathUtils.clamp(x,0,1);return x*x*(3-2*x);};
 const follow=(vector,x,y,z,damping)=>{
   vector.set(THREE.MathUtils.lerp(vector.x,x,damping),THREE.MathUtils.lerp(vector.y,y,damping),THREE.MathUtils.lerp(vector.z,z,damping));
 };
 function draw(now){
   requestAnimationFrame(draw);if(!active)return;
+  const expRect=experience.getBoundingClientRect();
+  const scrollTarget=THREE.MathUtils.clamp(-expRect.top/(experience.offsetHeight-innerHeight),0,1);
+  const busy=Math.abs(state.index-state.position)>.005||Math.abs(scrollTarget-state.scroll)>.005||now-lastPointerMove<350;
+  if(firstFrameReady&&now-lastRendered<(busy?16:32))return;
+  lastRendered=now;
   const dt=Math.min((now-last)/1000,.05);last=now;
   const damping=state.motion?1-Math.exp(-dt*7.5):1;
   const velocity=state.index-state.position;state.position+=velocity*damping;
@@ -136,17 +145,17 @@ function draw(now){
   const flavorColor=new THREE.Color(colors[selectedIndex]);
   accentLight.color.lerp(flavorColor,damping);
   flavorSpot.color.lerp(flavorColor,damping);
-  const rect=experience.getBoundingClientRect();
+  const rect=expRect;
   if(rect.bottom<=0){if(canvas.style.opacity!=='0')canvas.style.opacity='0';return;}
-  const target=THREE.MathUtils.clamp(-rect.top/(experience.offsetHeight-innerHeight),0,1);
+  const target=scrollTarget;
   state.scroll+=(target-state.scroll)*(state.motion?1-Math.exp(-dt*9):1);
   const mobile=innerWidth<=760,H=innerHeight;
-  const focusWindow=smooth((state.scroll-.27)/.10)*(1-smooth((state.scroll-.60)/.12));
-  const textSweep=THREE.MathUtils.clamp((state.scroll-.37)/.24,0,1);
-  const secondLine=smooth((textSweep-.18)/.25);
-  const thirdLine=smooth((textSweep-.58)/.25);
+  const focusWindow=smooth((state.scroll-.27)/.10)*(1-smooth((state.scroll-.79)/.09));
+  const textSweep=THREE.MathUtils.clamp((state.scroll-.39)/.34,0,1);
+  const secondLine=smooth((textSweep-.20)/.15);
+  const thirdLine=smooth((textSweep-.61)/.15);
   const textLightY=1-(1000+250*secondLine+250*thirdLine)/2048;
-  const lateZoom=smooth((state.scroll-.7)/.2);
+  const lateZoom=smooth((state.scroll-.83)/.17);
   const focusStyle=focusWindow.toFixed(3);
   if(focusStyle!==lastFocusStyle){
     sticky.style.setProperty('--detail-brightness',(1-focusWindow*.48).toFixed(3));
@@ -154,7 +163,7 @@ function draw(now){
     lastFocusStyle=focusStyle;
   }
   const enter=smooth((H-rect.top)/H),exit=Math.min(0,rect.bottom-H)/H;
-  if(canvas.style.opacity!=='1')canvas.style.opacity='1';
+  if(firstFrameReady&&canvas.style.opacity!=='1')canvas.style.opacity='1';
   const visibleHeight=2*Math.tan(THREE.MathUtils.degToRad(camera.fov/2))*camera.position.z;
   const vw=visibleHeight*camera.aspect;
   const bob=state.motion?Math.sin(now*.0008)*.045:0;
@@ -174,12 +183,12 @@ function draw(now){
     const heroHeight=mobile?Math.min(H*.41,360):Math.min(H*(H<950?.40:.45),460);
     const heroScale=visibleHeight*heroHeight/H/3.5;
     const detailHeight=mobile?H*.43:Math.min(H*.77,720);
-    const detailScale=visibleHeight*detailHeight/H/3.5*(mobile?1+.15*focusWindow+.08*lateZoom:.92+.24*focusWindow+.45*lateZoom);
+    const detailScale=visibleHeight*detailHeight/H/3.5*(mobile?1+.15*focusWindow+.08*lateZoom:.92+.24*focusWindow+.45*lateZoom)*(1+.055*textSweep*focusWindow);
     const gap=mobile?1.05:vw*.185;
     const x=offset*gap;
     const heroY=visibleHeight*(mobile?.035:.045)+(.11+(!mobile&&H<760?.12:0))*focus+Math.sin(i*2.2)*.08*(1-focus);
     const detailX=mobile?vw*.035:vw*(.19+lateZoom*.05);
-    const detailY=visibleHeight*(mobile?.11:-.045*focusWindow-.17*lateZoom)+visibleHeight*exit;
+    const detailY=visibleHeight*(mobile?.11:-.045*focusWindow-.17*lateZoom+.065*textSweep*focusWindow)+visibleHeight*exit;
     const t=selected?enter:0;
     m.position.set(THREE.MathUtils.lerp(x,detailX,t),THREE.MathUtils.lerp(heroY+bob*focus,detailY,t),THREE.MathUtils.lerp(-.55*(1-focus),.5,t));
     const scl=THREE.MathUtils.lerp(heroScale*(.85+.2*focus),detailScale,t)*(selected?1:1-enter);
@@ -188,7 +197,7 @@ function draw(now){
     m.scale.set(Math.max(.0001,scl*1.36),Math.max(.0001,scl),Math.max(.0001,scl*1.36));m.visible=scl>.01&&rect.bottom>0;
     // Turn to the back, hold it still while the light reads each line,
     // then rotate away only after the final line has been featured.
-    const rotation=state.motion?Math.PI*(smooth((state.scroll-.15)/.22)+smooth((state.scroll-.68)/.22)):(Math.floor(target*3)===1?Math.PI:0);
+    const rotation=state.motion?Math.PI*(smooth((state.scroll-.15)/.22)+smooth((state.scroll-.83)/.15)):(target>=.32&&target<.88?Math.PI:0);
     m.rotation.set(.08,THREE.MathUtils.lerp((1-focus)*Math.PI*.92,rotation,t)+state.pointer.x*.055*focus-velocity*.1,THREE.MathUtils.lerp(.24*focus+Math.sin(i*1.9)*.065*(1-focus),-.1+Math.cos(state.scroll*Math.PI*2)*.34-lateZoom*.55,t)+state.pointer.y*.025*focus+velocity*.025);
     // The selected object and its reflections move as a single continuous model.
     m.userData.material.envMapIntensity=(.2+focus*.95+enter*.25)*(1-focusWindow*.91);
@@ -210,18 +219,24 @@ function draw(now){
   follow(flavorSpot.position,focusModel.position.x+s*(1.6-focusWindow*1.05)-state.pointer.x*.24,focusModel.position.y+beamHeight+s*.3+state.pointer.y*.1,focusModel.position.z+2.4,lightDamping);
   follow(flavorSpot.target.position,focusModel.position.x,focusModel.position.y+beamHeight,focusModel.position.z,lightDamping);
   renderer.render(scene,camera);
+  if(!firstFrameReady){firstFrameReady=true;rootReady();canvas.style.opacity='1';}
   window.vyra3d.stats={calls:renderer.info.render.calls,triangles:renderer.info.render.triangles};
 }
 window.vyra3d={select(index){state.index=index;},motion(value){state.motion=value;if(!value)state.pointer.set(0,0);},stats:{}};
-document.addEventListener('pointermove',e=>{if(e.pointerType==='touch'||!state.motion)return;state.pointer.set(e.clientX/innerWidth-.5,e.clientY/innerHeight-.5);},{passive:true});
+document.addEventListener('pointermove',e=>{if(e.pointerType==='touch'||!state.motion)return;lastPointerMove=performance.now();state.pointer.set(e.clientX/innerWidth-.5,e.clientY/innerHeight-.5);},{passive:true});
 document.addEventListener('visibilitychange',()=>{active=!document.hidden;last=performance.now();});
 try{
+  // Let the lightweight product artwork paint before any WebGL setup work.
+  await nextPaint();
   renderer=new THREE.WebGLRenderer({canvas,alpha:true,antialias:true,powerPreference:'high-performance'});renderer.setClearColor(0,0);renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.3;
-  scene=new THREE.Scene();camera=new THREE.PerspectiveCamera(31,1,.1,50);camera.position.set(0,0,11);lighting();
+  scene=new THREE.Scene();camera=new THREE.PerspectiveCamera(31,1,.1,50);camera.position.set(0,0,11);await nextPaint();lighting();
   await document.fonts.load('400 40px "VYRA Display"');
-  models=colors.map((_,i)=>{const m=can(i);scene.add(m);return m;});resize();addEventListener('resize',resize);
+  for(let i=0;i<colors.length;i++){const m=can(i);scene.add(m);models.push(m);await nextPaint();}
+  resize();addEventListener('resize',resize);
+  // A restored scroll position must start on the matching product face.
+  state.scroll=THREE.MathUtils.clamp(-experience.getBoundingClientRect().top/(experience.offsetHeight-innerHeight),0,1);
   canvas.addEventListener('webglcontextlost',event=>{event.preventDefault();active=false;document.documentElement.classList.remove('webgl-ready');document.documentElement.classList.add('webgl-fallback');canvas.style.visibility='hidden';});
   canvas.addEventListener('webglcontextrestored',()=>{active=true;last=performance.now();canvas.style.visibility='';document.documentElement.classList.remove('webgl-fallback');rootReady();});
-  rootReady();requestAnimationFrame(draw);
+  requestAnimationFrame(draw);
 }catch(error){canvas.remove();document.documentElement.classList.add('webgl-fallback');console.warn('3D view unavailable; using product artwork fallback.',error.message);}
 function rootReady(){document.documentElement.classList.add('webgl-ready');document.documentElement.classList.remove('scene-loading');window.dispatchEvent(new Event('vyra3dready'));}

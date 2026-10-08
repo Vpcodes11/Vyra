@@ -83,10 +83,10 @@ function updateScroll(){
   framePending=false;
   const rect=experience.getBoundingClientRect(),range=Math.max(1,experience.offsetHeight-innerHeight);
   const progress=Math.min(1,Math.max(0,-rect.top/range));
-  const next=Math.min(2,Math.floor(progress*3));
+  const next=progress<.32?0:progress<.88?1:2;
   if(chapter!==next){chapter=next;document.querySelectorAll('.copy-panel').forEach((el,i)=>{el.classList.toggle('active',i===chapter);el.inert=i!==chapter;});
     document.querySelectorAll('[data-go]').forEach((el,i)=>{if(i===chapter)el.setAttribute('aria-current','step');else el.removeAttribute('aria-current');});$('#chapter-count').textContent='0'+(chapter+1)+' / 03';}
-  const angle=reduced?(chapter===1?180:0):progress<.5?progress*360:180+(progress-.5)*360;
+  const angle=reduced?(chapter===1?180:0):progress<.37?progress/.37*180:progress<.83?180:180+(progress-.83)/.17*180;
   const tilt=reduced?-12:-16+Math.sin(progress*Math.PI)*25;
   // Front/back render blending retains cylindrical volume at the turn.
   const backAmount=Math.min(1,Math.max(0,((1-Math.cos(angle*Math.PI/180))/2-.35)/.3));
@@ -97,7 +97,7 @@ function updateScroll(){
 addEventListener('scroll',()=>{if(!framePending){framePending=true;requestAnimationFrame(updateScroll);}},{passive:true});
 document.querySelectorAll('[data-go]').forEach(el=>el.addEventListener('click',()=>{
   const i=Number(el.dataset.go),range=experience.offsetHeight-innerHeight;
-  scrollTo({top:experience.offsetTop+range*((i+.12)/3),behavior:reduced?'instant':'smooth'});
+  scrollTo({top:experience.offsetTop+range*[.12,.41,.91][i],behavior:reduced?'instant':'smooth'});
 }));
 let resizeTimer;addEventListener('resize',()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(()=>{selectFlavor(selected);updateScroll();},100);});
 const menu=$('#menu'),menuButton=$('.menu-toggle');
