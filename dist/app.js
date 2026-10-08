@@ -64,11 +64,18 @@ window.addEventListener('pointerup',e=>{
   if(Math.abs(dx)>45&&Math.abs(dx)>Math.abs(dy)){stage.dataset.dragged='true';selectFlavor(selected+(dx<0?1:-1));setTimeout(()=>delete stage.dataset.dragged,150);}
 });
 stage.addEventListener('pointercancel',()=>{drag=null;});
+let pointerFrame=0,pointerX=0,pointerY=0;
 $('#collection').addEventListener('pointermove',e=>{
   if(reduced||e.pointerType==='touch')return;
-  root.style.setProperty('--px',((e.clientX/innerWidth-.5)*12).toFixed(1)+'px');root.style.setProperty('--py',((e.clientY/innerHeight-.5)*8).toFixed(1)+'px');
+  pointerX=e.clientX;pointerY=e.clientY;
+  if(pointerFrame)return;
+  pointerFrame=requestAnimationFrame(()=>{
+    pointerFrame=0;
+    root.style.setProperty('--px',((pointerX/innerWidth-.5)*12).toFixed(1)+'px');
+    root.style.setProperty('--py',((pointerY/innerHeight-.5)*8).toFixed(1)+'px');
+  });
 });
-$('#collection').addEventListener('pointerleave',()=>{root.style.setProperty('--px','0px');root.style.setProperty('--py','0px');});
+$('#collection').addEventListener('pointerleave',()=>{if(pointerFrame)cancelAnimationFrame(pointerFrame);pointerFrame=0;root.style.setProperty('--px','0px');root.style.setProperty('--py','0px');});
 function applyMotion(){window.vyra3d?.motion(!reduced);root.classList.toggle('reduced-motion',reduced);root.style.scrollBehavior=reduced?'auto':'';$('#motion-toggle').innerHTML='MOTION '+(reduced?'OFF':'ON')+' <span>◉</span>';$('#motion-toggle').setAttribute('aria-pressed',String(reduced));updateScroll();}
 $('#motion-toggle').addEventListener('click',()=>{reduced=!reduced;try{localStorage.setItem('vyra-reduced-motion',String(reduced));}catch{}applyMotion();});
 motionQuery.addEventListener('change',e=>{reduced=e.matches;applyMotion();});

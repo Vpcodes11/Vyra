@@ -43,3 +43,6 @@
 .detail-glow{background:radial-gradient(ellipse at 62% 79%,color-mix(in srgb,var(--light-color) 96%,transparent) 0%,color-mix(in srgb,var(--light-color) 78%,transparent) 30%,color-mix(in srgb,var(--light-color) 30%,transparent) 62%,transparent 85%)}
 .ambient{background:radial-gradient(ellipse at 50% 100%,color-mix(in srgb,var(--light-color) 45%,transparent),transparent 42%)}
 @media(max-width:760px){.selection{bottom:70px}}
+.detail-glow{filter:brightness(var(--detail-brightness,1))}
+.experience-sticky::after{content:'';position:absolute;inset:0;z-index:1;pointer-events:none;opacity:var(--focus-dim,0);background:radial-gradient(ellipse 42% 62% at 63% 50%,transparent 10%,rgba(5,3,12,.38) 58%,rgba(5,3,12,.82) 100%)}
+@media(max-width:760px){.chapter-label{top:10%}}

@@ -8,9 +8,16 @@ const lacquer=['#120e24','#220a16','#151707','#0b1b18','#211208'];
 let renderer,scene,camera,models=[],environment,accentLight,softbox,shoulderSpot,flavorSpot,active=true,last=performance.now();
 const canvas=document.createElement('canvas');canvas.className='product-canvas';canvas.setAttribute('aria-hidden','true');
 document.body.append(canvas);
+const experience=document.querySelector('#experience'),sticky=document.querySelector('.experience-sticky');
+let lastFocusStyle='';
 
 function label(index){
-  const c=document.createElement('canvas');c.width=2048;c.height=2048;const ctx=c.getContext('2d');
+  // The artwork is displayed at under 800 CSS pixels even in the close-up.
+  // Build it at 1024px and keep the two lighting masks at 512px instead of
+  // allocating three 2048px GPU textures for every flavor.
+  const size=1024,maskSize=512;
+  const c=document.createElement('canvas');c.width=c.height=size;const ctx=c.getContext('2d');
+  ctx.scale(size/2048,size/2048);
   ctx.fillStyle=lacquer[index];ctx.fillRect(0,0,c.width,c.height);
   // The reference keeps the face almost black. Flavor color catches the curved
   // edges as narrow anodized bands; the long white streaks come from softboxes.
@@ -31,14 +38,24 @@ function label(index){
   headings.forEach((h,i)=>{ctx.fillStyle=colors[index];ctx.font='bold 40px Arial';ctx.fillText(h,1540,960+i*250);ctx.fillStyle='#a39aaf';ctx.font='24px Arial';ctx.fillText('VYRA ENERGY  /  COLLECTION 01',1540,1025+i*250);});
   ctx.font='30px Arial';ctx.fillText('250 ML',1540,1850);
   ctx.font='bold 28px Arial';ctx.fillStyle='#e5dce9';ctx.fillText(['MIDNIGHT LYCHEE','RASPBERRY RUSH','CITRUS STATIC','MINT CURRENT','APRICOT AFTERGLOW'][index],515,1940);
-  const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;t.anisotropy=8;
+  const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;t.anisotropy=4;
   // Ink and lacquer need different reflectance. White print stays readable
   // while the colored aluminum carries the long studio reflections.
-  const mask=document.createElement('canvas');mask.width=2048;mask.height=2048;const mc=mask.getContext('2d');
-  mc.drawImage(c,0,0);const pixels=mc.getImageData(0,0,2048,2048);
-  for(let n=0;n<pixels.data.length;n+=4){const bright=Math.max(pixels.data[n],pixels.data[n+1],pixels.data[n+2]);const v=bright>160?46:215;pixels.data[n]=v;pixels.data[n+1]=v;pixels.data[n+2]=v;}
+  const mask=document.createElement('canvas');mask.width=mask.height=maskSize;const mc=mask.getContext('2d');
+  const print=document.createElement('canvas');print.width=print.height=maskSize;const pc=print.getContext('2d');
+  mc.drawImage(c,0,0,maskSize,maskSize);const pixels=mc.getImageData(0,0,maskSize,maskSize);
+  const printPixels=pc.createImageData(maskSize,maskSize);
+  for(let n=0;n<pixels.data.length;n+=4){
+    const bright=Math.max(pixels.data[n],pixels.data[n+1],pixels.data[n+2]);
+    const x=(n/4)%maskSize;
+    const ink=x>maskSize*1150/2048&&x<maskSize*1940/2048&&bright>80?255:0;
+    printPixels.data[n]=printPixels.data[n+1]=printPixels.data[n+2]=ink;printPixels.data[n+3]=255;
+    const v=bright>160?46:215;pixels.data[n]=v;pixels.data[n+1]=v;pixels.data[n+2]=v;
+  }
+  pc.putImageData(printPixels,0,0);
   mc.putImageData(pixels,0,0);const metalness=new THREE.CanvasTexture(mask);metalness.anisotropy=4;
-  return {color:t,metalness};
+  const emissive=new THREE.CanvasTexture(print);emissive.colorSpace=THREE.SRGBColorSpace;emissive.anisotropy=4;
+  return {color:t,metalness,emissive};
 }
 function brushedMetal(){
   const c=document.createElement('canvas');c.width=512;c.height=512;const ctx=c.getContext('2d');const d=ctx.createImageData(512,512);let seed=17;
@@ -54,7 +71,7 @@ function can(index){
   // Lathe's default UVs space profile points equally; labels need real height.
   for(let i=0;i<geometry.attributes.uv.count;i++)geometry.attributes.uv.setY(i,(geometry.attributes.position.getY(i)+1.75)/3.44);
   const artwork=label(index);
-  const material=new THREE.MeshPhysicalMaterial({map:artwork.color,metalnessMap:artwork.metalness,metalness:1,roughness:.31,clearcoat:.92,clearcoatRoughness:.16,envMapIntensity:1.05,bumpMap:brushed,bumpScale:.0007});
+  const material=new THREE.MeshPhysicalMaterial({map:artwork.color,metalnessMap:artwork.metalness,metalness:1,roughness:.31,clearcoat:.92,clearcoatRoughness:.16,envMapIntensity:1.05,bumpMap:brushed,bumpScale:.0007,emissive:new THREE.Color(colors[index]),emissiveMap:artwork.emissive,emissiveIntensity:0});
   g.add(new THREE.Mesh(geometry,material));
   const metal=new THREE.MeshPhysicalMaterial({color:'#d7d9d8',metalness:1,roughness:.27,envMapIntensity:1.5,bumpMap:brushed,bumpScale:.0015});
   const lid=new THREE.Group();
@@ -83,7 +100,7 @@ function lighting(){
   const room=new THREE.Scene();room.background=new THREE.Color('#08080b');
   const box=(x,y,z,w,h,color,intensity,ry=0)=>{const m=new THREE.Mesh(new THREE.PlaneGeometry(w,h),new THREE.MeshBasicMaterial({color:new THREE.Color(color).multiplyScalar(intensity),side:THREE.DoubleSide}));m.position.set(x,y,z);m.rotation.y=ry;room.add(m);};
   box(-4,1,4,1.8,8,'#fff7ec',5.5,.75);box(5,.5,1,.42,9,'#ffffff',6,-.9);box(0,5,2,7,2,'#ffffff',2.5);box(0,-3,4,6,1.5,'#a6a0a6',.6);
-  const pmrem=new THREE.PMREMGenerator(renderer);environment=pmrem.fromScene(room,.08);scene.environment=environment.texture;pmrem.dispose();
+  const pmrem=new THREE.PMREMGenerator(renderer);environment=pmrem.fromScene(room,.035);scene.environment=environment.texture;pmrem.dispose();
   RectAreaLightUniformsLib.init();scene.add(new THREE.AmbientLight('#e7e4e6',.3));
   softbox=new THREE.RectAreaLight('#fff8ef',4.5,2.5,7);softbox.position.set(-3,2.8,5);softbox.lookAt(0,0,0);scene.add(softbox);
   const edge=new THREE.RectAreaLight('#ffffff',7,.42,7);edge.position.set(3,.6,-1);edge.lookAt(0,0,0);scene.add(edge);
@@ -93,7 +110,7 @@ function lighting(){
   flavorSpot=new THREE.SpotLight(colors[0],33,5,.34,.95,1.5);
   scene.add(shoulderSpot,shoulderSpot.target,flavorSpot,flavorSpot.target);
 }
-function resize(){const w=innerWidth,h=innerHeight;renderer.setSize(w,h,false);renderer.setPixelRatio(Math.min(devicePixelRatio,w<760?1.5:1.75));camera.aspect=w/h;camera.updateProjectionMatrix();}
+function resize(){const w=innerWidth,h=innerHeight;renderer.setPixelRatio(Math.min(devicePixelRatio,w<760?1.2:1.4));renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();}
 const smooth=(x)=>{x=THREE.MathUtils.clamp(x,0,1);return x*x*(3-2*x);};
 const follow=(vector,x,y,z,damping)=>{
   vector.set(THREE.MathUtils.lerp(vector.x,x,damping),THREE.MathUtils.lerp(vector.y,y,damping),THREE.MathUtils.lerp(vector.z,z,damping));
@@ -107,12 +124,21 @@ function draw(now){
   const flavorColor=new THREE.Color(colors[selectedIndex]);
   accentLight.color.lerp(flavorColor,damping);
   flavorSpot.color.lerp(flavorColor,damping);
-  const exp=document.querySelector('#experience'),rect=exp.getBoundingClientRect();
-  const target=THREE.MathUtils.clamp(-rect.top/(exp.offsetHeight-innerHeight),0,1);
+  const rect=experience.getBoundingClientRect();
+  if(rect.bottom<=0){if(canvas.style.opacity!=='0')canvas.style.opacity='0';return;}
+  const target=THREE.MathUtils.clamp(-rect.top/(experience.offsetHeight-innerHeight),0,1);
   state.scroll+=(target-state.scroll)*(state.motion?1-Math.exp(-dt*9):1);
   const mobile=innerWidth<=760,H=innerHeight;
+  const focusWindow=smooth((state.scroll-.28)/.10)*(1-smooth((state.scroll-.59)/.12));
+  const lateZoom=smooth((state.scroll-.7)/.2);
+  const focusStyle=focusWindow.toFixed(3);
+  if(focusStyle!==lastFocusStyle){
+    sticky.style.setProperty('--detail-brightness',(1-focusWindow*.87).toFixed(3));
+    sticky.style.setProperty('--focus-dim',focusStyle);
+    lastFocusStyle=focusStyle;
+  }
   const enter=smooth((H-rect.top)/H),exit=Math.min(0,rect.bottom-H)/H;
-  canvas.style.opacity=rect.bottom<=0?'0':'1';
+  if(canvas.style.opacity!=='1')canvas.style.opacity='1';
   const visibleHeight=2*Math.tan(THREE.MathUtils.degToRad(camera.fov/2))*camera.position.z;
   const vw=visibleHeight*camera.aspect;
   const bob=state.motion?Math.sin(now*.0008)*.045:0;
@@ -122,34 +148,37 @@ function draw(now){
     const heroHeight=mobile?Math.min(H*.41,360):Math.min(H*(H<950?.40:.45),460);
     const heroScale=visibleHeight*heroHeight/H/3.5;
     const detailHeight=mobile?H*.43:Math.min(H*.77,720);
-    const detailScale=visibleHeight*detailHeight/H/3.5;
+    const detailScale=visibleHeight*detailHeight/H/3.5*(mobile?1+.15*focusWindow+.08*lateZoom:.92+.24*focusWindow+.45*lateZoom);
     const gap=mobile?1.05:vw*.185;
     const x=offset*gap;
     const heroY=visibleHeight*(mobile?.035:.045)+(.11+(!mobile&&H<760?.12:0))*focus+Math.sin(i*2.2)*.08*(1-focus);
-    const detailX=mobile?vw*.035:vw*.14;
-    const detailY=visibleHeight*(mobile?.11:0)+visibleHeight*exit;
+    const detailX=mobile?vw*.035:vw*(.19+lateZoom*.05);
+    const detailY=visibleHeight*(mobile?.11:-.045*focusWindow-.17*lateZoom)+visibleHeight*exit;
     const t=selected?enter:0;
     m.position.set(THREE.MathUtils.lerp(x,detailX,t),THREE.MathUtils.lerp(heroY+bob*focus,detailY,t),THREE.MathUtils.lerp(-.55*(1-focus),.5,t));
     const scl=THREE.MathUtils.lerp(heroScale*(.85+.2*focus),detailScale,t)*(selected?1:1-enter);
-    m.scale.setScalar(Math.max(.0001,scl));m.visible=scl>.01&&rect.bottom>0;
+    // Keep the modeled body at the same classic-can aspect ratio as the
+    // artwork shown while WebGL initializes, including through the zoom.
+    m.scale.set(Math.max(.0001,scl*1.36),Math.max(.0001,scl),Math.max(.0001,scl*1.36));m.visible=scl>.01&&rect.bottom>0;
     const rotation=state.motion?state.scroll*Math.PI*2:(Math.floor(target*3)===1?Math.PI:0);
-    m.rotation.set(.08,THREE.MathUtils.lerp((1-focus)*Math.PI*.92,rotation,t)+state.pointer.x*.055*focus-velocity*.1,THREE.MathUtils.lerp(.24*focus+Math.sin(i*1.9)*.065*(1-focus),-.1+Math.cos(state.scroll*Math.PI*2)*.34,t)+state.pointer.y*.025*focus+velocity*.025);
+    m.rotation.set(.08,THREE.MathUtils.lerp((1-focus)*Math.PI*.92,rotation,t)+state.pointer.x*.055*focus-velocity*.1,THREE.MathUtils.lerp(.24*focus+Math.sin(i*1.9)*.065*(1-focus),-.1+Math.cos(state.scroll*Math.PI*2)*.34-lateZoom*.55,t)+state.pointer.y*.025*focus+velocity*.025);
     // The selected object and its reflections move as a single continuous model.
-    m.userData.material.envMapIntensity=.2+focus*.95+enter*.25;
-    m.userData.material.color.setScalar(.25+focus*.75);
+    m.userData.material.envMapIntensity=(.2+focus*.95+enter*.25)*(1-focusWindow*.72);
+    m.userData.material.color.setScalar(.25+focus*.75-(selected?focusWindow*.6:0));
     m.userData.material.clearcoat=.3+focus*.65;
+    m.userData.material.emissiveIntensity=selected?focusWindow*2.2:0;
     const explode=focus*(1-enter);
     m.userData.lid.position.y=1.71+.49*explode;
     m.userData.lid.rotation.x=.55*explode;
     m.userData.bottom.position.y=-1.73-.28*explode;
     m.userData.bottom.rotation.x=.32*explode;
   });
-  const focusModel=models[selectedIndex],s=focusModel.scale.x;
+  const focusModel=models[selectedIndex],s=focusModel.scale.y;
   const lightDamping=state.motion?1-Math.exp(-dt*5):1;
   follow(shoulderSpot.position,focusModel.position.x-s*1.7+state.pointer.x*.18,focusModel.position.y+s*1.4+state.pointer.y*.12,focusModel.position.z+2.7,lightDamping);
   follow(shoulderSpot.target.position,focusModel.position.x,focusModel.position.y+s*.85,focusModel.position.z,lightDamping);
-  follow(flavorSpot.position,focusModel.position.x+s*1.6-state.pointer.x*.24,focusModel.position.y-s*.75+state.pointer.y*.1,focusModel.position.z+2.4,lightDamping);
-  follow(flavorSpot.target.position,focusModel.position.x,focusModel.position.y-s*.7,focusModel.position.z,lightDamping);
+  follow(flavorSpot.position,focusModel.position.x+s*(1.6-focusWindow*.8)-state.pointer.x*.24,focusModel.position.y+s*(-.75+focusWindow*1.2)+state.pointer.y*.1,focusModel.position.z+2.4,lightDamping);
+  follow(flavorSpot.target.position,focusModel.position.x,focusModel.position.y+s*(-.7+focusWindow*.95),focusModel.position.z,lightDamping);
   renderer.render(scene,camera);
   window.vyra3d.stats={calls:renderer.info.render.calls,triangles:renderer.info.render.triangles};
 }

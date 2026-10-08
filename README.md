@@ -39,3 +39,13 @@ Product images: original AI-generated artwork created for this project. Anton: V
 The can now has a refined multi-ring shoulder, rolled metal seams, recessed aluminum lid, extruded pull tab with rivet, and a concave base. Separate print/metal reflectance maps preserve the ivory label while the lacquer carries broader studio reflections. Locally bundled area lights provide warm softbox fill, a narrow white rim, overhead metal highlights, and flavor-colored fill. Aluminum uses a subtle deterministic brushed bump texture. Supporting cans have reduced exposure and clearcoat to maintain selected-product emphasis.
 
 The selected product also has two restrained spotlights aimed at different parts of its body: a warm shoulder glint and a flavor-colored reflection near the lower label. Their position and color ease with the carousel and scroll transition, and pointer movement shifts the highlights subtly on desktop.
+
+## Scroll spotlight sequence
+
+The product starts at a restrained size on the first detail chapter. In the middle chapter it turns toward its back print and grows while the flavor backdrop dims almost to black. A narrow flavor light follows the label, and a separate emissive ink mask keeps only the small can text readable. The environment and lacquer reflections drop in intensity during this beat; the saturated backdrop and larger can return as the final chapter arrives. The 3D body uses the same full classic-can proportions as the artwork visible while WebGL initializes.
+
+The collection and middle chapter were inspected in-browser after this revision.
+
+## Performance
+
+The five can labels now use 1024px color maps and 512px lighting masks. This cuts their raw texture pixels by about eight times compared with the earlier 2048px maps while preserving the visible print and spotlight. The renderer caps its pixel ratio at 1.4 on desktop and 1.2 on mobile, skips 3D rendering after the product experience leaves the viewport, and avoids rewriting unchanged lighting styles every frame. Pointer parallax updates once per animation frame. The flavor carousel and scroll spotlight were checked in the local preview after these changes.
