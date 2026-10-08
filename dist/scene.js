@@ -1,57 +1,79 @@
 import * as THREE from './vendor/three.module.js';
+import {RectAreaLightUniformsLib} from './vendor/addons/RectAreaLightUniformsLib.js';
 
 // Geometry, typography and lighting are original to VYRA. No screenshot crops.
 const state={index:0,position:0,scroll:0,motion:true,pointer:new THREE.Vector2()};
 const colors=['#6150ce','#bb155d','#b3bc35','#239d86','#c57632'];
-let renderer,scene,camera,models=[],environment,accentLight,active=true,last=performance.now();
+let renderer,scene,camera,models=[],environment,accentLight,softbox,active=true,last=performance.now();
 const canvas=document.createElement('canvas');canvas.className='product-canvas';canvas.setAttribute('aria-hidden','true');
 document.body.append(canvas);
 
 function label(index){
   const c=document.createElement('canvas');c.width=2048;c.height=2048;const ctx=c.getContext('2d');
-  ctx.fillStyle='#17131c';ctx.fillRect(0,0,c.width,c.height);
+  ctx.fillStyle='#16121c';ctx.fillRect(0,0,c.width,c.height);
   // A subtle satin finish; all reflections are calculated by the renderer.
-  ctx.fillStyle=colors[index];ctx.globalAlpha=.36;ctx.fillRect(0,0,c.width,c.height);ctx.globalAlpha=1;
+  ctx.fillStyle=colors[index];ctx.globalAlpha=.7;ctx.fillRect(0,0,c.width,c.height);ctx.globalAlpha=1;
   ctx.save();ctx.translate(515,1010);ctx.rotate(-Math.PI/2);ctx.fillStyle='#eeeada';ctx.textAlign='center';ctx.textBaseline='middle';
   ctx.font='italic 460px "VYRA Display"';ctx.scale(1540/ctx.measureText('VYRA').width,1.06);ctx.fillText('VYRA',0,0);ctx.restore();
-  ctx.textAlign='center';ctx.fillStyle=colors[index];ctx.font='bold 74px Arial';ctx.fillText('ENERGY',515,1820);
+  ctx.textAlign='center';ctx.fillStyle='#d1c7df';ctx.font='bold 74px Arial';ctx.fillText('ENERGY',515,1820);
   ctx.font='23px Arial';ctx.fillStyle='#c7c1cf';ctx.fillText('AFTERHOURS / 250 ML',515,1900);
-  ctx.fillStyle=colors[index];ctx.font='italic 130px "VYRA Display"';ctx.fillText('VYRA',1540,520);
+  ctx.fillStyle='#d1c7df';ctx.font='italic 130px "VYRA Display"';ctx.fillText('VYRA',1540,520);
   ctx.font='34px Arial';ctx.fillText('FIND YOUR FREQUENCY',1540,635);
   const headings=['BRIGHT FLAVOR','A FRESH PERSPECTIVE','THE AFTERHOURS EDITION'];
   headings.forEach((h,i)=>{ctx.fillStyle=colors[index];ctx.font='bold 40px Arial';ctx.fillText(h,1540,960+i*250);ctx.fillStyle='#a39aaf';ctx.font='24px Arial';ctx.fillText('VYRA ENERGY  /  COLLECTION 01',1540,1025+i*250);});
   ctx.font='30px Arial';ctx.fillText('250 ML',1540,1850);
-  const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;t.anisotropy=4;return t;
+  ctx.font='bold 28px Arial';ctx.fillStyle='#e5dce9';ctx.fillText(['MIDNIGHT LYCHEE','RASPBERRY RUSH','CITRUS STATIC','MINT CURRENT','APRICOT AFTERGLOW'][index],515,1940);
+  const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;t.anisotropy=8;
+  // Ink and lacquer need different reflectance. White print stays readable
+  // while the colored aluminum carries the long studio reflections.
+  const mask=document.createElement('canvas');mask.width=2048;mask.height=2048;const mc=mask.getContext('2d');
+  mc.drawImage(c,0,0);const pixels=mc.getImageData(0,0,2048,2048);
+  for(let n=0;n<pixels.data.length;n+=4){const bright=Math.max(pixels.data[n],pixels.data[n+1],pixels.data[n+2]);const v=bright>160?46:215;pixels.data[n]=v;pixels.data[n+1]=v;pixels.data[n+2]=v;}
+  mc.putImageData(pixels,0,0);const metalness=new THREE.CanvasTexture(mask);metalness.anisotropy=4;
+  return {color:t,metalness};
 }
+function brushedMetal(){
+  const c=document.createElement('canvas');c.width=512;c.height=512;const ctx=c.getContext('2d');const d=ctx.createImageData(512,512);let seed=17;
+  const rnd=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};
+  for(let y=0;y<512;y++){const line=rnd()*18;for(let x=0;x<512;x++){const p=(y*512+x)*4,v=115+line+rnd()*12;d.data[p]=d.data[p+1]=d.data[p+2]=v;d.data[p+3]=255;}}
+  ctx.putImageData(d,0,0);const t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(6,6);return t;
+}
+const brushed=brushedMetal();
 function can(index){
   const g=new THREE.Group();
-  const profile=[[-1.75,.40],[-1.72,.44],[-1.65,.45],[-1.56,.475],[1.47,.475],[1.55,.46],[1.62,.425],[1.69,.425]];
+  const profile=[[-1.75,.40],[-1.73,.422],[-1.70,.438],[-1.66,.443],[-1.61,.456],[-1.55,.47],[-1.49,.475],[1.40,.475],[1.46,.473],[1.51,.464],[1.56,.446],[1.61,.428],[1.65,.423],[1.69,.424]];
   const geometry=new THREE.LatheGeometry(profile.map(([y,r])=>new THREE.Vector2(r,y)),96,-Math.PI/2);
   // Lathe's default UVs space profile points equally; labels need real height.
   for(let i=0;i<geometry.attributes.uv.count;i++)geometry.attributes.uv.setY(i,(geometry.attributes.position.getY(i)+1.75)/3.44);
-  const material=new THREE.MeshPhysicalMaterial({map:label(index),metalness:.78,roughness:.24,clearcoat:.8,clearcoatRoughness:.2,envMapIntensity:1.2});
+  const artwork=label(index);
+  const material=new THREE.MeshPhysicalMaterial({map:artwork.color,metalnessMap:artwork.metalness,metalness:1,roughness:.29,clearcoat:1,clearcoatRoughness:.12,envMapIntensity:1.2,bumpMap:brushed,bumpScale:.0007});
   g.add(new THREE.Mesh(geometry,material));
-  const metal=new THREE.MeshStandardMaterial({color:'#bfc4cb',metalness:1,roughness:.21,envMapIntensity:1.6});
+  const metal=new THREE.MeshPhysicalMaterial({color:'#d7d9d8',metalness:1,roughness:.27,envMapIntensity:1.5,bumpMap:brushed,bumpScale:.0015});
   const lid=new THREE.Group();
-  const disk=new THREE.Mesh(new THREE.CylinderGeometry(.434,.434,.035,80),metal);lid.add(disk);
+  const disk=new THREE.Mesh(new THREE.CylinderGeometry(.434,.434,.025,80),metal);lid.add(disk);
   const rim=new THREE.Mesh(new THREE.TorusGeometry(.443,.027,12,96),metal);rim.rotation.x=Math.PI/2;rim.position.y=.018;lid.add(rim);
   const inset=new THREE.Mesh(new THREE.TorusGeometry(.36,.009,8,80),metal);inset.rotation.x=Math.PI/2;inset.position.y=.025;lid.add(inset);
-  const tab=new THREE.Mesh(new THREE.TorusGeometry(.108,.027,10,40),metal);tab.rotation.x=Math.PI/2;tab.scale.set(.73,1,1.6);tab.position.set(0,.055,.045);lid.add(tab);
-  const opening=new THREE.Mesh(new THREE.CircleGeometry(.105,40),new THREE.MeshStandardMaterial({color:'#25262a',metalness:.5,roughness:.5}));opening.rotation.x=-Math.PI/2;opening.scale.y=1.4;opening.position.set(0,.027,-.17);lid.add(opening);
+  const tabShape=new THREE.Shape();tabShape.moveTo(-.095,-.13);tabShape.bezierCurveTo(-.145,-.05,-.135,.15,-.06,.21);tabShape.bezierCurveTo(-.02,.24,.06,.23,.09,.18);tabShape.bezierCurveTo(.14,.09,.14,-.06,.095,-.13);tabShape.quadraticCurveTo(0,-.19,-.095,-.13);
+  const hole=new THREE.Path();hole.absellipse(0,.06,.067,.11,0,Math.PI*2,true);tabShape.holes.push(hole);
+  const tab=new THREE.Mesh(new THREE.ExtrudeGeometry(tabShape,{depth:.015,bevelEnabled:true,bevelSize:.005,bevelThickness:.004,bevelSegments:2,steps:1,curveSegments:16}),metal);tab.rotation.x=-Math.PI/2;tab.position.set(0,.05,.04);lid.add(tab);
+  const rivet=new THREE.Mesh(new THREE.SphereGeometry(.033,16,8),metal);rivet.scale.y=.3;rivet.position.set(0,.065,.16);lid.add(rivet);
+  const opening=new THREE.Mesh(new THREE.RingGeometry(.092,.105,48),new THREE.MeshStandardMaterial({color:'#707276',metalness:.9,roughness:.4}));opening.rotation.x=-Math.PI/2;opening.scale.y=1.45;opening.position.set(0,.022,-.2);lid.add(opening);
+  const recessed=new THREE.Mesh(new THREE.CylinderGeometry(.345,.345,.008,64),metal);recessed.position.y=.018;lid.add(recessed);
   lid.position.y=1.71;g.add(lid);
   const base=new THREE.Mesh(new THREE.TorusGeometry(.423,.027,12,96),metal);base.rotation.x=Math.PI/2;base.position.y=-1.73;g.add(base);
-  const bottom=new THREE.Mesh(new THREE.CylinderGeometry(.416,.40,.035,80),metal);bottom.position.y=-1.75;g.add(bottom);
+  const bottom=new THREE.Mesh(new THREE.LatheGeometry([new THREE.Vector2(0,-1.69),new THREE.Vector2(.32,-1.69),new THREE.Vector2(.395,-1.75),new THREE.Vector2(.425,-1.75)],80),metal);g.add(bottom);
   g.userData={index,material,lid};return g;
 }
 function lighting(){
   const room=new THREE.Scene();room.background=new THREE.Color('#08080b');
   const box=(x,y,z,w,h,color,intensity,ry=0)=>{const m=new THREE.Mesh(new THREE.PlaneGeometry(w,h),new THREE.MeshBasicMaterial({color:new THREE.Color(color).multiplyScalar(intensity),side:THREE.DoubleSide}));m.position.set(x,y,z);m.rotation.y=ry;room.add(m);};
-  box(-4,1,3,1,8,'#ffffff',5,.8);box(5,0,2,.7,9,'#bfc7ff',4,-.8);box(0,5,1,7,2,'#ffffff',4);box(0,-3,4,6,1,'#777388',1);
-  const pmrem=new THREE.PMREMGenerator(renderer);environment=pmrem.fromScene(room,.04);scene.environment=environment.texture;pmrem.dispose();
-  scene.add(new THREE.AmbientLight('#ddd6ef',.65));
-  const key=new THREE.DirectionalLight('#ffffff',3);key.position.set(-3,5,6);scene.add(key);
-  const rim=new THREE.DirectionalLight('#bcb9ff',2.5);rim.position.set(4,1,-2);scene.add(rim);
-  accentLight=new THREE.PointLight(colors[0],20,15,2);accentLight.position.set(-2,-.5,3);scene.add(accentLight);
+  box(-4,1,4,2.7,8,'#fff7ec',4,.75);box(5,.5,1,.6,8,'#ffffff',7,-.9);box(0,5,2,8,3,'#ffffff',3);box(0,-3,4,7,2,'#a6a0a6',.75);
+  const pmrem=new THREE.PMREMGenerator(renderer);environment=pmrem.fromScene(room,.08);scene.environment=environment.texture;pmrem.dispose();
+  RectAreaLightUniformsLib.init();scene.add(new THREE.AmbientLight('#e7e4e6',.3));
+  softbox=new THREE.RectAreaLight('#fff8ef',4.5,4,7);softbox.position.set(-3,2.8,5);softbox.lookAt(0,0,0);scene.add(softbox);
+  const edge=new THREE.RectAreaLight('#ffffff',9,.65,6);edge.position.set(3,.6,-1);edge.lookAt(0,0,0);scene.add(edge);
+  const ceiling=new THREE.RectAreaLight('#ffffff',4,5,2);ceiling.position.set(0,4.5,2);ceiling.lookAt(0,0,0);scene.add(ceiling);
+  accentLight=new THREE.RectAreaLight(colors[0],5,3,5);accentLight.position.set(-2,-.5,2);accentLight.lookAt(0,0,0);scene.add(accentLight);
 }
 function resize(){const w=innerWidth,h=innerHeight;renderer.setSize(w,h,false);renderer.setPixelRatio(Math.min(devicePixelRatio,w<760?1.5:1.75));camera.aspect=w/h;camera.updateProjectionMatrix();}
 const smooth=(x)=>{x=THREE.MathUtils.clamp(x,0,1);return x*x*(3-2*x);};
@@ -89,7 +111,9 @@ function draw(now){
     const rotation=state.motion?state.scroll*Math.PI*2:(Math.floor(target*3)===1?Math.PI:0);
     m.rotation.set(.08,THREE.MathUtils.lerp((1-focus)*Math.PI*.92,rotation,t)+state.pointer.x*.055*focus-velocity*.1,THREE.MathUtils.lerp(.24*focus,-.1+Math.cos(state.scroll*Math.PI*2)*.34,t)+state.pointer.y*.025*focus+velocity*.025);
     // The selected object and its reflections move as a single continuous model.
-    m.userData.material.envMapIntensity=.32+focus*.95+enter*.25;
+    m.userData.material.envMapIntensity=.2+focus*.95+enter*.25;
+    m.userData.material.color.setScalar(.25+focus*.75);
+    m.userData.material.clearcoat=.3+focus*.65;
   });
   renderer.render(scene,camera);
   window.vyra3d.stats={calls:renderer.info.render.calls,triangles:renderer.info.render.triangles};
@@ -98,7 +122,7 @@ window.vyra3d={select(index){state.index=index;},motion(value){state.motion=valu
 document.addEventListener('pointermove',e=>{if(e.pointerType==='touch'||!state.motion)return;state.pointer.set(e.clientX/innerWidth-.5,e.clientY/innerHeight-.5);},{passive:true});
 document.addEventListener('visibilitychange',()=>{active=!document.hidden;last=performance.now();});
 try{
-  renderer=new THREE.WebGLRenderer({canvas,alpha:true,antialias:true,powerPreference:'high-performance'});renderer.setClearColor(0,0);renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.25;
+  renderer=new THREE.WebGLRenderer({canvas,alpha:true,antialias:true,powerPreference:'high-performance'});renderer.setClearColor(0,0);renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.3;
   scene=new THREE.Scene();camera=new THREE.PerspectiveCamera(31,1,.1,50);camera.position.set(0,0,11);lighting();
   await document.fonts.load('400 40px "VYRA Display"');
   models=colors.map((_,i)=>{const m=can(i);scene.add(m);return m;});resize();addEventListener('resize',resize);

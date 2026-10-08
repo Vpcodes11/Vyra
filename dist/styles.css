@@ -36,3 +36,6 @@
 :root{transition:--light-color 900ms ease}
 .ambient{background:radial-gradient(ellipse at 50% 92%,color-mix(in srgb,var(--light-color) 28%,transparent),transparent 35%)}
 .detail-glow{background:radial-gradient(ellipse at 62% 73%,color-mix(in srgb,var(--light-color) 75%,transparent),color-mix(in srgb,var(--light-color) 30%,transparent) 30%,transparent 62%),radial-gradient(ellipse at 15% 63%,color-mix(in srgb,var(--light-color) 40%,transparent),transparent 48%)}
+/* Flavor light blooms against a deep studio backdrop. */
+.detail-glow{inset:0;background:radial-gradient(ellipse at 62% 70%,color-mix(in srgb,var(--light-color) 95%,transparent),color-mix(in srgb,var(--light-color) 48%,transparent) 36%,transparent 75%)}
+.experience-sticky{background:#100918}.collection{background:radial-gradient(ellipse at 50% 77%,#77766e 0%,#414044 27%,#19151f 57%,#0d0915 90%)}

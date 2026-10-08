@@ -33,3 +33,7 @@ Checked in Chromium/Edge at 1440×1000, 390×844 and 768×844. Visually reviewed
 Product images: original AI-generated artwork created for this project. Anton: Vernon Adams, licensed under the SIL Open Font License (see `dist/assets/FONT-LICENSE.txt`). All assets are bundled locally.
 
 
+
+## Premium material revision
+
+The can now has a refined multi-ring shoulder, rolled metal seams, recessed aluminum lid, extruded pull tab with rivet, and a concave base. Separate print/metal reflectance maps preserve the ivory label while the lacquer carries broader studio reflections. Locally bundled area lights provide warm softbox fill, a narrow white rim, overhead metal highlights, and flavor-colored fill. Aluminum uses a subtle deterministic brushed bump texture. Supporting cans have reduced exposure and clearcoat to maintain selected-product emphasis.
