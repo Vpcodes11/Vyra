@@ -28,9 +28,17 @@ function label(index){
   const gc=glow.getContext('2d');gc.fillStyle='#000';gc.fillRect(0,0,512,1024);gc.scale(.25,.5);
   const ctx=c.getContext('2d'),mc=surface.getContext('2d');ctx.scale(.5,1);mc.scale(.25,.5);
   ctx.fillStyle=lacquer[index];ctx.fillRect(0,0,2048,2048);
-  mc.fillStyle='rgb(0,61,225)';mc.fillRect(0,0,2048,2048);
+  const grain=mc.createImageData(512,1024);let grainSeed=91;
+  for(let i=0;i<grain.data.length;i+=4){
+    grainSeed=(Math.imul(grainSeed,1664525)+1013904223)>>>0;
+    grain.data[i]=0;grain.data[i+1]=79+(grainSeed%13);grain.data[i+2]=180+(grainSeed%9);grain.data[i+3]=255;
+  }
+  mc.putImageData(grain,0,0);
+  // Bare aluminum at the neck and heel catches the same studio lights as the ends.
+  ctx.fillStyle='#adb0b2';mc.fillStyle='rgb(0,91,250)';
+  for(const context of [ctx,mc]){context.fillRect(0,0,2048,32);context.fillRect(0,2018,2048,30);}
   const text=(value,x,y,font,color='#e9e6dd',align='center')=>{
-    for(const [context,ink] of [[ctx,color],[mc,'rgb(0,145,22)']]){
+    for(const [context,ink] of [[ctx,color],[mc,'rgb(0,123,18)']]){
       context.font=font;context.fillStyle=ink;context.textAlign=align;context.fillText(value,x,y);
     }
   };
@@ -38,14 +46,14 @@ function label(index){
     context.save();context.translate(518,995);context.rotate(-Math.PI/2);
     context.font='570px "VYRA Can"';context.textAlign='center';context.textBaseline='middle';
     context.scale(1430/context.measureText('VYRA').width,1.04);
-    context.fillStyle=context===ctx?'#eeece3':'rgb(0,145,22)';context.fillText('VYRA',0,0);context.restore();
+    context.fillStyle=context===ctx?'#eeece3':'rgb(0,123,18)';context.fillText('VYRA',0,0);context.restore();
   }
   text('ENERGY',518,1800,'132px "VYRA Can"',colors[index]);
   text('250 ML  /  FIND YOUR FREQUENCY',518,1870,'23px Arial');
   text(names[index],518,1918,'bold 27px Arial');
   for(const context of [ctx,mc]){
     context.save();context.translate(255,1020);context.rotate(-Math.PI/2);context.font='bold 38px Arial';context.textAlign='center';
-    context.fillStyle=context===ctx?colors[index]:'rgb(0,145,22)';context.fillText(names[index],0,0);context.restore();
+    context.fillStyle=context===ctx?colors[index]:'rgb(0,123,18)';context.fillText(names[index],0,0);context.restore();
   }
   text('VYRA',1536,390,'120px "VYRA Can"');
   text('FIND YOUR FREQUENCY',1536,458,'26px Arial');
@@ -62,7 +70,7 @@ function label(index){
     gc.fillStyle='#fff';gc.font='bold 37px Arial';gc.fillText(heading,1536,y);
     gc.shadowBlur=5;gc.fillStyle='#bcbcbc';gc.font='28px Arial';
     backCopy[i].forEach((line,j)=>gc.fillText(line,1536,y+61+j*38));
-    for(const [context,color] of [[ctx,'#615b68'],[mc,'rgb(0,145,22)']]){
+    for(const [context,color] of [[ctx,'#615b68'],[mc,'rgb(0,123,18)']]){
       context.fillStyle=color;context.fillRect(1270,y+132,532,1.5);
     }
   });
@@ -74,13 +82,17 @@ function label(index){
   return {color:t,surface:mask,glow:halo};
 }
 function brushedMetal(){
-  const c=document.createElement('canvas');c.width=c.height=256;
-  const ctx=c.getContext('2d');let seed=17;
-  for(let y=0;y<256;y++){
+  const c=document.createElement('canvas');c.width=512;c.height=256;
+  const ctx=c.getContext('2d'),pixels=ctx.createImageData(c.width,c.height);let seed=17;
+  const lines=new Float32Array(c.width);
+  for(let x=0;x<c.width;x++){seed=(Math.imul(seed,1664525)+1013904223)>>>0;lines[x]=(seed%17)-8;}
+  for(let y=0;y<c.height;y++)for(let x=0;x<c.width;x++){
     seed=(Math.imul(seed,1664525)+1013904223)>>>0;
-    const v=128+(seed%17);ctx.fillStyle=`rgb(${v},${v},${v})`;ctx.fillRect(0,y,256,1);
+    const i=(y*c.width+x)*4,v=128+lines[x]*.6+(seed%7)-3;
+    pixels.data[i]=pixels.data[i+1]=pixels.data[i+2]=v;pixels.data[i+3]=255;
   }
-  const texture=new THREE.CanvasTexture(c);texture.wrapS=texture.wrapT=THREE.RepeatWrapping;texture.repeat.set(4,4);return texture;
+  ctx.putImageData(pixels,0,0);
+  const texture=new THREE.CanvasTexture(c);texture.wrapS=texture.wrapT=THREE.RepeatWrapping;texture.repeat.set(3,2);return texture;
 }
 function focusedPrint(material){
   const center={value:1-910/2048};
@@ -135,61 +147,82 @@ function can(index){
     applyArtwork(g,index);return g;
   }
   const g=new THREE.Group();
-  const profile=[[-1.75,.40],[-1.73,.422],[-1.70,.438],[-1.66,.443],[-1.61,.456],[-1.55,.47],[-1.49,.475],[1.37,.475],[1.43,.474],[1.47,.469],[1.51,.461],[1.55,.450],[1.59,.438],[1.62,.429],[1.65,.425],[1.68,.425],[1.70,.429]];
+  // The drawn shell rolls into a shallow heel and a gradual neck, never a sharp cylinder edge.
+  const profile=[[-1.75,.402],[-1.738,.418],[-1.72,.431],[-1.695,.440],[-1.665,.442],[-1.635,.447],[-1.595,.458],[-1.55,.468],[-1.50,.474],[-1.45,.475],[1.35,.475],[1.405,.474],[1.445,.470],[1.48,.463],[1.515,.453],[1.545,.442],[1.572,.433],[1.598,.427],[1.622,.425],[1.66,.425],[1.685,.428],[1.70,.434]];
   const geometry=new THREE.LatheGeometry(profile.map(([y,r])=>new THREE.Vector2(r,y)),72,-Math.PI/2);
   // Lathe's default UVs space profile points equally; labels need real height.
   for(let i=0;i<geometry.attributes.uv.count;i++)geometry.attributes.uv.setY(i,(geometry.attributes.position.getY(i)+1.75)/3.44);
   const artwork=artworks[wrap(index)];
-  const material=new THREE.MeshPhysicalMaterial({map:artwork.color,emissiveMap:artwork.glow,emissive:'#ffffff',emissiveIntensity:0,metalnessMap:artwork.surface,roughnessMap:artwork.surface,metalness:1,roughness:1,clearcoat:.32,clearcoatRoughness:.24,envMapIntensity:1,bumpMap:brushed,bumpScale:.00045});
+  const material=new THREE.MeshPhysicalMaterial({map:artwork.color,emissiveMap:artwork.glow,emissive:'#ffffff',emissiveIntensity:0,metalnessMap:artwork.surface,roughnessMap:artwork.surface,metalness:1,roughness:1,clearcoat:.18,clearcoatRoughness:.32,envMapIntensity:1,bumpMap:brushed,bumpScale:.0011});
   focusedPrint(material);g.add(new THREE.Mesh(geometry,material));
   const metal=new THREE.MeshPhysicalMaterial({color:'#aeb5b9',metalness:1,roughness:.23,clearcoat:.08,clearcoatRoughness:.3,envMapIntensity:1.5,bumpMap:brushed,bumpScale:.0007});
-  const satinMetal=new THREE.MeshStandardMaterial({color:'#9aa0a3',metalness:.92,roughness:.34,envMapIntensity:1.1,bumpMap:brushed,bumpScale:.00045});
+  const satinMetal=new THREE.MeshStandardMaterial({color:'#9aa0a3',metalness:.92,roughness:.34,envMapIntensity:1.1,bumpMap:brushed,bumpScale:.0011});
   const lid=new THREE.Group();lid.name='lid';
   const disk=new THREE.Mesh(new THREE.LatheGeometry([new THREE.Vector2(0,-.004),new THREE.Vector2(.2,-.006),new THREE.Vector2(.3,-.014),new THREE.Vector2(.36,-.011),new THREE.Vector2(.405,.01),new THREE.Vector2(.435,.012),new THREE.Vector2(.435,-.014),new THREE.Vector2(.4,-.015)],72),satinMetal);lid.add(disk);
-  const rim=new THREE.Mesh(new THREE.TorusGeometry(.443,.027,8,72),metal);rim.rotation.x=Math.PI/2;rim.position.y=.018;lid.add(rim);
-  const inset=new THREE.Mesh(new THREE.TorusGeometry(.36,.009,8,64),metal);inset.rotation.x=Math.PI/2;inset.position.y=.025;lid.add(inset);
+  const rim=new THREE.Mesh(new THREE.TorusGeometry(.443,.018,8,72),metal);rim.rotation.x=Math.PI/2;rim.position.y=.018;lid.add(rim);
+  const inset=new THREE.Mesh(new THREE.TorusGeometry(.36,.007,6,64),metal);inset.rotation.x=Math.PI/2;inset.position.y=.025;lid.add(inset);
   const tabShape=new THREE.Shape();tabShape.moveTo(-.095,-.13);tabShape.bezierCurveTo(-.145,-.05,-.135,.15,-.06,.21);tabShape.bezierCurveTo(-.02,.24,.06,.23,.09,.18);tabShape.bezierCurveTo(.14,.09,.14,-.06,.095,-.13);tabShape.quadraticCurveTo(0,-.19,-.095,-.13);
   const hole=new THREE.Path();hole.absellipse(0,.06,.067,.11,0,Math.PI*2,true);tabShape.holes.push(hole);
   const tab=new THREE.Mesh(new THREE.ExtrudeGeometry(tabShape,{depth:.015,bevelEnabled:true,bevelSize:.005,bevelThickness:.004,bevelSegments:2,steps:1,curveSegments:16}),metal);tab.rotation.x=-Math.PI/2;tab.position.set(0,.05,.04);lid.add(tab);
   const score=new THREE.Mesh(new THREE.RingGeometry(.255,.26,64),new THREE.MeshBasicMaterial({color:'#596065',side:THREE.DoubleSide}));score.rotation.x=-Math.PI/2;score.position.y=.029;score.scale.y=1.12;lid.add(score);
   const rivet=new THREE.Mesh(new THREE.SphereGeometry(.033,16,8),metal);rivet.scale.y=.3;rivet.position.set(0,.065,.16);lid.add(rivet);
   const opening=new THREE.Mesh(new THREE.RingGeometry(.092,.105,48),new THREE.MeshStandardMaterial({color:'#707276',metalness:.9,roughness:.4}));opening.rotation.x=-Math.PI/2;opening.scale.y=1.45;opening.position.set(0,.022,-.2);lid.add(opening);
+  const underside=new THREE.Mesh(new THREE.LatheGeometry([
+    new THREE.Vector2(0,-.018),new THREE.Vector2(.20,-.018),new THREE.Vector2(.28,-.023),
+    new THREE.Vector2(.32,-.032),new THREE.Vector2(.348,-.03),new THREE.Vector2(.36,-.023),
+    new THREE.Vector2(.395,-.022),new THREE.Vector2(.418,-.035),new THREE.Vector2(.435,-.025)
+  ],64),satinMetal);lid.add(underside);
+  // Aluminum pressure ribs and a smaller central stamping catch changing highlights.
+  for(const radius of [.30,.398]){
+    const rib=new THREE.Mesh(new THREE.TorusGeometry(radius,.006,6,64),metal);
+    rib.rotation.x=Math.PI/2;rib.position.y=-.028;lid.add(rib);
+  }
   lid.position.y=1.71;g.add(lid);
   // A dark well and a rolled rim remain on the can when the real lid lifts.
   const openingWell=new THREE.Mesh(new THREE.CylinderGeometry(.395,.395,.012,64),new THREE.MeshPhysicalMaterial({color:'#07080a',metalness:.72,roughness:.48}));openingWell.position.y=1.672;g.add(openingWell);
   const mouthRim=new THREE.Mesh(new THREE.TorusGeometry(.426,.014,8,72),metal);mouthRim.rotation.x=Math.PI/2;mouthRim.position.y=1.68;g.add(mouthRim);
-  const base=new THREE.Mesh(new THREE.TorusGeometry(.423,.027,8,72),metal);base.rotation.x=Math.PI/2;base.position.y=-1.73;g.add(base);
+  const base=new THREE.Mesh(new THREE.TorusGeometry(.423,.017,8,72),metal);base.rotation.x=Math.PI/2;base.position.y=-1.73;g.add(base);
   const bottom=new THREE.Group();bottom.name='bottom';
   const foot=new THREE.Mesh(new THREE.LatheGeometry([new THREE.Vector2(0,.065),new THREE.Vector2(.15,.061),new THREE.Vector2(.29,.039),new THREE.Vector2(.36,.008),new THREE.Vector2(.414,0),new THREE.Vector2(.414,-.028)],64),satinMetal);bottom.add(foot);
   const footRing=new THREE.Mesh(new THREE.TorusGeometry(.413,.018,8,72),metal);footRing.rotation.x=Math.PI/2;footRing.position.y=.018;bottom.add(footRing);
-  const footInset=new THREE.Mesh(new THREE.CircleGeometry(.32,64),new THREE.MeshStandardMaterial({color:'#70767a',metalness:.92,roughness:.32,envMapIntensity:1.2}));footInset.rotation.x=-Math.PI/2;footInset.position.y=.019;bottom.add(footInset);
-  const footGroove=new THREE.Mesh(new THREE.TorusGeometry(.29,.006,6,64),new THREE.MeshBasicMaterial({color:'#50565a'}));footGroove.rotation.x=Math.PI/2;footGroove.position.y=.024;bottom.add(footGroove);
+  const footInset=new THREE.Mesh(new THREE.CircleGeometry(.22,64),new THREE.MeshStandardMaterial({color:'#70767a',metalness:.92,roughness:.32,envMapIntensity:1.2}));footInset.rotation.x=-Math.PI/2;footInset.position.y=.067;bottom.add(footInset);
+  const footGroove=new THREE.Mesh(new THREE.TorusGeometry(.29,.008,6,64),new THREE.MeshBasicMaterial({color:'#50565a'}));footGroove.rotation.x=Math.PI/2;footGroove.position.y=.046;bottom.add(footGroove);
+  const baseDome=new THREE.Mesh(new THREE.LatheGeometry([
+    new THREE.Vector2(0,-.035),new THREE.Vector2(.14,-.036),new THREE.Vector2(.23,-.044),
+    new THREE.Vector2(.30,-.063),new THREE.Vector2(.36,-.07),new THREE.Vector2(.389,-.055),new THREE.Vector2(.414,-.028)
+  ],64),satinMetal);bottom.add(baseDome);
   bottom.position.y=-1.73;g.add(bottom);
   mergeStatic(lid);mergeStatic(bottom);mergeStatic(g);g.userData={material,lid,bottom,logical:index,flavor:index};template=g;return g;
 }
 
 function lighting(){
-  const room=new THREE.Scene();room.background=new THREE.Color('#29272d');
+  const room=new THREE.Scene();room.background=new THREE.Color('#222128');
+  const cbox=document.createElement('canvas');cbox.width=64;cbox.height=128;
+  const bctx=cbox.getContext('2d'),gradient=bctx.createLinearGradient(0,0,64,0);
+  gradient.addColorStop(0,'#050505');gradient.addColorStop(.17,'#868686');
+  gradient.addColorStop(.42,'#ffffff');gradient.addColorStop(.7,'#ebebeb');gradient.addColorStop(1,'#111111');
+  bctx.fillStyle=gradient;bctx.fillRect(0,0,64,128);
+  const softReflection=new THREE.CanvasTexture(cbox);softReflection.colorSpace=THREE.SRGBColorSpace;
   const panel=(x,y,z,w,h,intensity,angle=0)=>{
-    const mesh=new THREE.Mesh(new THREE.PlaneGeometry(w,h),new THREE.MeshBasicMaterial({color:new THREE.Color('#eeeae4').multiplyScalar(intensity),side:THREE.DoubleSide}));
+    const mesh=new THREE.Mesh(new THREE.PlaneGeometry(w,h),new THREE.MeshBasicMaterial({map:softReflection,color:new THREE.Color('#eeeae4').multiplyScalar(intensity),side:THREE.DoubleSide}));
     mesh.position.set(x,y,z);mesh.rotation.y=angle;room.add(mesh);return mesh;
   };
-  panel(-4,1,3,.8,7,3,.75);panel(4,.5,1,.22,8,5,-.9);
+  panel(-4,1,3,2.1,7,4,.75);panel(4,.5,1,.48,8,4.2,-.9);
   panel(0,5,0,5,4,3).rotation.x=Math.PI/2;
   panel(0,-4,0,4,4,1.7).rotation.x=Math.PI/2;
   panel(0,3.5,-4,3.5,4,1.3);
   const pmrem=new THREE.PMREMGenerator(renderer);
   environment=pmrem.fromScene(room,.055,.1,30,{size:128});scene.environment=environment.texture;
-  pmrem.dispose();room.traverse(o=>{o.geometry?.dispose();o.material?.dispose();});
+  pmrem.dispose();softReflection.dispose();room.traverse(o=>{o.geometry?.dispose();o.material?.dispose();});
   RectAreaLightUniformsLib.init();
   ambientLight=new THREE.AmbientLight('#dddbe2',.18);scene.add(ambientLight);
   const area=(color,power,w,h,x,y,z)=>{
     const light=new THREE.RectAreaLight(color,power,w,h);light.position.set(x,y,z);light.lookAt(0,0,0);scene.add(light);return light;
   };
-  softbox=area('#f6f1e9',3.2,1.15,6,-3,2,4);
-  edgeLight=area('#e5e4ee',5,.24,7,3,.5,1);
+  softbox=area('#f6f1e9',3.2,2.4,6,-3,2,4);
+  edgeLight=area('#e5e4ee',5,.42,7,3,.5,1);
   ceilingLight=area('#f6f4ee',3,4,1.1,0,4,2);
-  accentLight=area(colors[0],1.7,.65,6,-2,0,2);
+  accentLight=area(colors[0],1.7,1.1,6,-2,0,2);
   // A soft horizontal gobo shapes a real light on the curved label surface.
   const c=document.createElement('canvas');c.width=c.height=128;const ctx=c.getContext('2d');
   const pixels=ctx.createImageData(128,128);
@@ -282,7 +315,7 @@ function draw(now){
     material.userData.focusCenter.value=1-(910+290*beat.scan)/2048;
     material.color.setScalar(THREE.MathUtils.lerp(.64+.36*focus,1,reveal));
     material.envMapIntensity=(.55+.5*focus)*(1-beat.focus*.84);
-    material.clearcoat=.32*(1-beat.focus*.94);
+    material.clearcoat=.18*(1-beat.focus*.9);
     const explode=focus*(1-entry)*(1-reveal);
     model.userData.lid.position.y=1.71+.62*explode;model.userData.lid.rotation.x=.38*explode;
     model.userData.bottom.position.y=-1.73-.4*explode;model.userData.bottom.rotation.x=.23*explode;
@@ -317,7 +350,7 @@ try{
   renderer.setClearColor(0,0);renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.08;
   scene=new THREE.Scene();camera=new THREE.PerspectiveCamera(31,1,.1,50);camera.position.set(0,0,11);
   await nextPaint();lighting();brushed=brushedMetal();
-  trimMaterial=new THREE.MeshStandardMaterial({color:'#ffffff',vertexColors:true,metalness:.95,roughness:.27,envMapIntensity:1.25,bumpMap:brushed,bumpScale:.0006});
+  trimMaterial=new THREE.MeshStandardMaterial({color:'#ffffff',vertexColors:true,side:THREE.DoubleSide,metalness:.95,roughness:.3,envMapIntensity:1.25,bumpMap:brushed,bumpScale:.0012});
   await document.fonts.load('400 40px "VYRA Can"');
   for(let i=0;i<5;i++){artworks.push(label(i));renderer.initTexture(artworks[i].color);renderer.initTexture(artworks[i].surface);renderer.initTexture(artworks[i].glow);await nextPaint();}
   for(let i=-3;i<=3;i++){const model=can(i);model.userData.logical=i;applyArtwork(model,i);scene.add(model);models.push(model);}

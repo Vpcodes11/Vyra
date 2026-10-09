@@ -4,6 +4,8 @@ A runnable cinematic product website with an original fictional brand. Its float
 
 ![VYRA focused label lighting](docs/spotlight.jpg)
 
+![VYRA aluminum and print finish](docs/aluminum-detail.jpg)
+
 ## Run
 
 Run `npm start` in this folder and open `http://127.0.0.1:3000/`. Serve `dist` on any static HTTP host for deployment. Opening the HTML directly uses the artwork fallback because the 3D renderer requires HTTP modules.
@@ -11,7 +13,7 @@ Run `npm start` in this folder and open `http://127.0.0.1:3000/`. Serve `dist` o
 ## Product experience
 
 - Seven visible carousel positions wrap through five original flavors. Selected-product emphasis, varied depth and rotation, detachable modeled lids and bases, restrained parallax and damped transitions.
-- Formed can shoulders, rolled seams, recessed lid stampings, an extruded pull tab and rivet, and a domed base. Printed ink and lacquer use separate roughness and metalness values. Reflections come from the studio environment and area lights.
+- Gradually formed shoulders, fine rolled seams, recessed lid stampings on both sides, an extruded pull tab and rivet, and a domed base with pressure ribs. Printed ink and lacquer use separate roughness and metalness values. Fine draw marks and subtly varied lacquer roughness break up the uniform surface; graduated studio softboxes produce broad aluminum reflections.
 - One continuous backdrop carries the homepage into the close-up without a section boundary. Rich flavor color and stronger metallic highlights return outside the dark reading sequence. Supporting cans move offstage rather than shrinking into visible fragments.
 - Four product chapters share a single scroll timeline with the renderer. Three reading holds illuminate successive back-label areas with a real projected spotlight. A soft flavor-tinted glow follows only the current text area, fading away as the spotlight moves. The halo is sampled on the curved can surface without a fullscreen bloom pass. The camera gently tracks and enlarges the can during these moments.
 - The can turns to its front and pulls back into a complete lineup, which remains visible before the FAQ.
@@ -22,7 +24,7 @@ VYRA is a fictional design concept. It has no checkout or manufactured formula.
 
 ## Performance
 
-The seven can models share stamping geometry, metal materials and five label sets. Stampings are merged into one draw per independently moving part. A full desktop carousel uses 28 draw calls; a single close-up uses four. Its geometry stays below 100,000 triangles.
+The seven can models share stamping geometry, metal materials and five label sets. Stampings are merged into one draw per independently moving part. A full desktop carousel uses 28 draw calls and about 112,500 triangles; a single close-up uses four draws and about 16,100 triangles. The narrow mobile viewport culls the outer cans.
 
 Label color maps are 1024×2048, with shared 512×1024 surface and focused-print maps. These are painted directly, without scanning image pixels or rebuilding textures while scrolling. The reflection environment uses a 128px cube. Shader programs compile asynchronously before the first rendered frame replaces the fallback artwork.
 
