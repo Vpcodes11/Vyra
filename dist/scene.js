@@ -1,7 +1,7 @@
 import * as THREE from './vendor/three.module.js';
 import {RectAreaLightUniformsLib} from './vendor/addons/RectAreaLightUniformsLib.js';
-import {clamp,smooth,experienceBeat} from './experience-timeline.js';
-import {carouselPose} from './product-motion.js';
+import {clamp,smooth,experienceBeat,cinemaFrame} from './experience-timeline.js';
+import {carouselPose,lineupPose} from './product-motion.js';
 
 const started=performance.now();
 const state={index:0,position:0,scroll:0,motion:!matchMedia('(prefers-reduced-motion: reduce)').matches,pointer:new THREE.Vector2(),pointerTarget:new THREE.Vector2()};
@@ -16,7 +16,7 @@ let renderer,scene,camera,environment,softbox,edgeLight,ceilingLight,accentLight
 let template,brushed,trimMaterial,models=[],artworks=[],firstFrame=false,active=true,dirty=true,lastRendered=0,last=performance.now(),lastPointer=0;
 let top=0,range=1,end=0,viewH=0,viewW=0,frustumH=0,frustumW=0,lastStyle='';
 const beamTarget=new THREE.Vector3(),beamPosition=new THREE.Vector3();
-const poseEuler=new THREE.Euler(0,0,0,'ZYX'),heroRotation=new THREE.Quaternion(),detailRotation=new THREE.Quaternion(),lineupRotation=new THREE.Quaternion(),partRotation=new THREE.Quaternion(),inverseRotation=new THREE.Quaternion(),lineupPosition=new THREE.Vector3();
+const poseEuler=new THREE.Euler(0,0,0,'ZYX'),heroRotation=new THREE.Quaternion(),detailRotation=new THREE.Quaternion(),lineupRotation=new THREE.Quaternion(),posterRotation=new THREE.Quaternion(),partRotation=new THREE.Quaternion(),inverseRotation=new THREE.Quaternion(),lineupPosition=new THREE.Vector3();
 const endAxis=new THREE.Vector3(0,1,0);
 const neutral=new THREE.Color('#f2eee9'),flavorColor=new THREE.Color();
 const wrap=n=>((n%5)+5)%5;
@@ -27,14 +27,24 @@ function label(index){
   // baked reflection. A separate print mask adds only the focused text halo.
   const c=document.createElement('canvas');c.width=1024;c.height=2048;
   const surface=document.createElement('canvas');surface.width=512;surface.height=1024;
-  const glow=document.createElement('canvas');glow.width=512;glow.height=1024;
-  const gc=glow.getContext('2d');gc.fillStyle='#000';gc.fillRect(0,0,512,1024);gc.scale(.25,.5);
-  const ctx=c.getContext('2d'),mc=surface.getContext('2d');ctx.scale(.5,1);mc.scale(.25,.5);
-  ctx.fillStyle=lacquer[index];ctx.fillRect(0,0,2048,2048);
+  const glow=document.createElement('canvas');glow.width=glow.height=1024;
+  const gc=glow.getContext('2d');gc.fillStyle='#000';gc.fillRect(0,0,1024,1024);gc.scale(.5,.5);
+  const ctx=c.getContext('2d'),mc=surface.getContext('2d');
+  // Fine metallic grain is part of the original lacquer, never a painted highlight.
+  const tile=document.createElement('canvas');tile.width=tile.height=128;
+  const tileCtx=tile.getContext('2d'),paint=tileCtx.createImageData(128,128),hex=Number.parseInt(lacquer[index].slice(1),16);
+  const red=hex>>16,green=(hex>>8)&255,blue=hex&255;let paintSeed=131+index;
+  for(let i=0;i<paint.data.length;i+=4){
+    paintSeed=(Math.imul(paintSeed,1664525)+1013904223)>>>0;
+    const grain=(paintSeed%11)-5;
+    paint.data[i]=red+grain;paint.data[i+1]=green+grain;paint.data[i+2]=blue+grain;paint.data[i+3]=255;
+  }
+  tileCtx.putImageData(paint,0,0);ctx.fillStyle=ctx.createPattern(tile,'repeat');ctx.fillRect(0,0,1024,2048);
+  ctx.scale(.5,1);mc.scale(.25,.5);
   const grain=mc.createImageData(512,1024);let grainSeed=91;
   for(let i=0;i<grain.data.length;i+=4){
     grainSeed=(Math.imul(grainSeed,1664525)+1013904223)>>>0;
-    grain.data[i]=0;grain.data[i+1]=79+(grainSeed%13);grain.data[i+2]=180+(grainSeed%9);grain.data[i+3]=255;
+    grain.data[i]=0;grain.data[i+1]=70+(grainSeed%23)+Math.round(Math.sin((i/4%512)*.038)*4);grain.data[i+2]=193+(grainSeed%13);grain.data[i+3]=255;
   }
   mc.putImageData(grain,0,0);
   // Bare aluminum at the neck and heel catches the same studio lights as the ends.
@@ -51,7 +61,7 @@ function label(index){
     context.scale(1430/context.measureText('VYRA').width,1.04);
     context.fillStyle=context===ctx?'#eeece3':'rgb(0,123,18)';context.fillText('VYRA',0,0);context.restore();
   }
-  text('ENERGY',518,1800,'132px "VYRA Can"',colors[index]);
+  text('ENERGY',518,1800,'125px "VYRA Display"',colors[index]);
   text('250 ML  /  FIND YOUR FREQUENCY',518,1870,'23px Arial');
   text(names[index],518,1918,'bold 27px Arial');
   for(const context of [ctx,mc]){
@@ -64,19 +74,26 @@ function label(index){
   headings.forEach((heading,i)=>{
     const y=850+i*290;
     // Pale flavor ink remains readable under the neutral focused light.
-    const ink=new THREE.Color(colors[index]).lerp(new THREE.Color('#e3ded9'),.64).getStyle();
+    const ink=new THREE.Color(colors[index]).lerp(new THREE.Color('#e3ded9'),.22).getStyle();
     text(String(i+1).padStart(2,'0'),1274,y,'bold 25px Arial',ink);
-    text(heading,1536,y,'bold 37px Arial',ink);
-    backCopy[i].forEach((line,j)=>text(line,1536,y+61+j*38,'28px Arial','#c4bec8'));
+    text(heading,1536,y,'36px "VYRA Display"',ink);
+    backCopy[i].forEach((line,j)=>text(line,1536,y+51+j*31,'24px Arial','#a6a0ac'));
     // Soft ink-shaped halo stays attached to the curved label, with no fullscreen bloom pass.
-    gc.textAlign='center';gc.shadowColor='#fff';gc.shadowBlur=9;
-    gc.fillStyle='#fff';gc.font='bold 37px Arial';gc.fillText(heading,1536,y);
-    gc.shadowBlur=5;gc.fillStyle='#bcbcbc';gc.font='28px Arial';
-    backCopy[i].forEach((line,j)=>gc.fillText(line,1536,y+61+j*38));
+    gc.textAlign='center';gc.shadowColor='#fff';gc.shadowBlur=2;
+    gc.fillStyle='#fff';gc.font='36px "VYRA Display"';gc.fillText(heading,1536,y);
+    gc.shadowBlur=1;gc.fillStyle='#929292';gc.font='24px Arial';
+    backCopy[i].forEach((line,j)=>gc.fillText(line,1536,y+51+j*31));
     for(const [context,color] of [[ctx,'#615b68'],[mc,'rgb(0,123,18)']]){
-      context.fillStyle=color;context.fillRect(1270,y+132,532,1.5);
+      context.fillStyle=color;context.fillRect(1270,y+119,532,1);
     }
   });
+  text('AN ORIGINAL FREQUENCY. A FRESH POINT OF VIEW.',1536,1646,'18px Arial','#9b95a2');
+  text('KEEP YOUR CURIOSITY COLD.',1536,1679,'bold 21px Arial','#aaa3b2');
+  // Original edition barcode and small print give the packaging a complete reverse side.
+  for(const [context,ink] of [[ctx,'#a8a1ad'],[mc,'rgb(0,123,18)']]){
+    context.fillStyle=ink;let x=1360;
+    for(let bar=0;bar<52;bar++){const width=1+((bar*13+index*7)%4);context.fillRect(x,1710,width,45);x+=width+3;}
+  }
   text('VYRA / COLLECTION 01',1536,1790,'22px Arial','#aaa2b0');
   text('250 ML',1536,1840,'bold 26px Arial');
   const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;t.anisotropy=4;
@@ -159,7 +176,7 @@ function can(index){
   for(let i=0;i<geometry.attributes.uv.count;i++)geometry.attributes.uv.setY(i,(geometry.attributes.position.getY(i)+1.75)/3.44);
   geometry.scale(1.36,1,1.36);
   const artwork=artworks[wrap(index)];
-  const material=new THREE.MeshPhysicalMaterial({map:artwork.color,emissiveMap:artwork.glow,emissive:'#ffffff',emissiveIntensity:0,metalnessMap:artwork.surface,roughnessMap:artwork.surface,metalness:1,roughness:1,clearcoat:.18,clearcoatRoughness:.32,envMapIntensity:1,bumpMap:brushed,bumpScale:.0011});
+  const material=new THREE.MeshPhysicalMaterial({map:artwork.color,emissiveMap:artwork.glow,emissive:'#ffffff',emissiveIntensity:0,metalnessMap:artwork.surface,roughnessMap:artwork.surface,metalness:1,roughness:1,clearcoat:.18,clearcoatRoughness:.32,envMapIntensity:1,bumpMap:brushed,bumpScale:.0021,anisotropy:.18});
   focusedPrint(material);g.add(new THREE.Mesh(geometry,material));
   const metal=new THREE.MeshPhysicalMaterial({color:'#aeb5b9',metalness:1,roughness:.23,clearcoat:.08,clearcoatRoughness:.3,envMapIntensity:1.5,bumpMap:brushed,bumpScale:.0007});
   const satinMetal=new THREE.MeshStandardMaterial({color:'#9aa0a3',metalness:.92,roughness:.34,envMapIntensity:1.1,bumpMap:brushed,bumpScale:.0011});
@@ -202,7 +219,7 @@ function can(index){
 }
 
 function lighting(){
-  const room=new THREE.Scene();room.background=new THREE.Color('#222128');
+  const room=new THREE.Scene();room.background=new THREE.Color('#16151b');
   const cbox=document.createElement('canvas');cbox.width=64;cbox.height=128;
   const bctx=cbox.getContext('2d'),gradient=bctx.createLinearGradient(0,0,64,0);
   gradient.addColorStop(0,'#050505');gradient.addColorStop(.17,'#868686');
@@ -213,7 +230,8 @@ function lighting(){
     const mesh=new THREE.Mesh(new THREE.PlaneGeometry(w,h),new THREE.MeshBasicMaterial({map:softReflection,color:new THREE.Color('#eeeae4').multiplyScalar(intensity),side:THREE.DoubleSide}));
     mesh.position.set(x,y,z);mesh.rotation.y=angle;room.add(mesh);return mesh;
   };
-  panel(-4,1,3,2.1,7,4,.75);panel(4,.5,1,.48,8,4.2,-.9);
+  panel(-4,1.6,3,1.65,5.8,3.8,.75);panel(4,-.4,1,.24,6.2,5.2,-.9);
+  panel(-2.7,-1.5,-2,.18,4,2.3,.4);
   panel(0,5,0,5,4,3).rotation.x=Math.PI/2;
   panel(0,-4,0,4,4,1.7).rotation.x=Math.PI/2;
   panel(0,3.5,-4,3.5,4,1.3);
@@ -225,7 +243,7 @@ function lighting(){
   const area=(color,power,w,h,x,y,z)=>{
     const light=new THREE.RectAreaLight(color,power,w,h);light.position.set(x,y,z);light.lookAt(0,0,0);scene.add(light);return light;
   };
-  softbox=area('#f6f1e9',3.2,2.4,6,-3,2,4);
+  softbox=area('#f6f1e9',3.2,1.45,6,-3,2,4);
   edgeLight=area('#e5e4ee',5,.42,7,3,.5,1);
   ceilingLight=area('#f6f4ee',3,4,1.1,0,4,2);
   accentLight=area(colors[0],1.7,1.1,6,-2,0,2);
@@ -233,7 +251,7 @@ function lighting(){
   const c=document.createElement('canvas');c.width=c.height=128;const ctx=c.getContext('2d');
   const pixels=ctx.createImageData(128,128);
   for(let y=0;y<128;y++)for(let x=0;x<128;x++){
-    const i=(y*128+x)*4,v=255*Math.exp(-.5*((x-64)/38)**2-.5*((y-64)/12)**2);
+    const i=(y*128+x)*4,v=255*Math.exp(-.5*((x-64)/33)**2-.5*((y-64)/8.5)**2);
     pixels.data[i]=pixels.data[i+1]=pixels.data[i+2]=v;pixels.data[i+3]=255;
   }
   ctx.putImageData(pixels,0,0);
@@ -263,20 +281,20 @@ function draw(now){
   state.scroll+=(target-state.scroll)*damping;
   state.pointer.lerp(state.pointerTarget,damping);
   const beat=experienceBeat(state.scroll),entry=smooth((y-top+viewH)/viewH),exit=Math.min(0,(end-y-viewH)/viewH);
-  const selected=wrap(state.index),reveal=beat.lineup;
+  const selected=wrap(state.index),reveal=beat.lineup,frame=cinemaFrame(state.scroll);
   flavorColor.set(colors[selected]);accentLight.color.lerp(flavorColor,damping);
-  flavorSpot.color.copy(neutral).lerp(flavorColor,.24);
+  flavorSpot.color.copy(flavorColor).lerp(neutral,.12);
   softbox.intensity=3.7*(1-beat.focus*.96);
   edgeLight.intensity=6.5*(1-beat.focus*.93);
   ceilingLight.intensity=3.6*(1-beat.focus*.95);
   ambientLight.intensity=.18*(1-beat.focus*.85);
   accentLight.intensity=3.4*(1-beat.focus*.91);
-  flavorSpot.intensity=beat.focus*105;
+  flavorSpot.intensity=beat.focus*80;
   trimMaterial.envMapIntensity=1.25*(1-beat.focus*.76);
   const style=[entry,beat.focus,reveal,beat.copy].map(v=>v.toFixed(3)).join('/');
   if(style!==lastStyle){
-    setStyle('--studio-color-strength',(.78+entry*.38)*(1-beat.focus*.86)*(1-reveal*.28));
-    setStyle('--studio-base-strength',.5*(1-entry*.6)*(1-beat.focus*.75));
+    setStyle('--studio-color-strength',(.22+entry*1.05)*(1-beat.focus*.48)*(1-reveal*.82));
+    setStyle('--studio-base-strength',1-entry*.87*(1-reveal));
     setStyle('--copy-visibility',smooth((entry-.6)/.4)*beat.copy);
     setStyle('--lineup-visibility',smooth((reveal-.28)/.5));
     setStyle('--focus-dim',beat.focus);lastStyle=style;
@@ -287,20 +305,20 @@ function draw(now){
   if(firstFrame&&canvas.style.opacity!=='1')canvas.style.opacity='1';
   const heroHeight=mobile?Math.min(viewH*.37,340):Math.min(viewH*.42,455);
   const heroScale=frustumH*heroHeight/viewH/3.5;
-  const detailHeight=mobile?viewH*(viewH<720?.33:.41):Math.min(viewH*.76,750);
-  const detailScale=frustumH*detailHeight/viewH/3.5*(1+beat.focus*(mobile?.13:.12)+beat.scan*.022*beat.focus);
-  const gap=mobile?1.18:frustumW*.16;
-  const lineupScale=frustumH*(mobile?.29:.43)/3.5;
+  const detailHeight=mobile?viewH*(viewH<720?.33:.41):Math.min(viewH*.88,960);
+  const detailScale=frustumH*detailHeight/viewH/3.5*(1+beat.focus*(mobile?.13:.16)+beat.scan*.035*beat.focus);
+  const gap=mobile?1.26:frustumW*.175;
+  const lineupScale=frustumH*(mobile?.27:.34)/3.5;
   let focusModel;
   for(const model of models){
     let logical=model.userData.logical;
-    if(Math.abs(logical-state.position)>3.5){logical+=Math.round((state.position-logical)/7)*7;model.userData.logical=logical;applyArtwork(model,logical);}
+    if(Math.abs(logical-state.position)>5.5){logical+=Math.round((state.position-logical)/11)*11;model.userData.logical=logical;applyArtwork(model,logical);}
     const offset=logical-state.position,isSelected=logical===state.index;
     const pose=carouselPose(offset,logical,now/1000,state.pointer.x,state.pointer.y,state.motion,velocity),focus=pose.focus;
     const heroX=offset*gap,heroY=frustumH*(mobile?.075:.065)+Math.sin(logical*1.8)*.12*(1-focus)+pose.float;
     const heroZ=pose.depth;
-    const detailX=mobile?frustumW*.01:frustumW*.19;
-    const detailY=frustumH*(mobile?.145:-.008+beat.scan*.024*beat.focus)+frustumH*exit;
+    const detailX=mobile?frustumW*.01:frustumW*(.22-frame.track*.014);
+    const detailY=frustumH*(mobile?.145:-.065+frame.track*.066)+frustumH*exit;
     const t=isSelected?entry:0;
     let scale=THREE.MathUtils.lerp(heroScale*(.84+.23*focus),detailScale,t)*(isSelected?1:1-entry*.15);
     model.position.set(THREE.MathUtils.lerp(heroX*(isSelected?1:1+entry*5),detailX,t),THREE.MathUtils.lerp(heroY,detailY,t),THREE.MathUtils.lerp(heroZ,.25,t));
@@ -309,19 +327,26 @@ function draw(now){
     const turnPitch=.13+Math.sin(beat.turn*Math.PI)*.22*(1-beat.focus);
     detailRotation.setFromEuler(poseEuler.set(turnPitch,rotation+state.pointer.x*.025*(1-beat.focus),.34+beat.scan*.018*beat.focus,'ZYX'));
     model.quaternion.copy(heroRotation).slerp(detailRotation,t);
+    if(isSelected&&frame.withdraw>0){
+      scale=THREE.MathUtils.lerp(scale,frustumH*(mobile?.30:.32)/3.5,frame.withdraw);
+      model.position.lerp(lineupPosition.set(0,frustumH*(mobile?.09:.045)+frustumH*exit,.45),frame.withdraw);
+      posterRotation.setFromEuler(poseEuler.set(.24,Math.PI*2-.18,.28,'ZYX'));
+      model.quaternion.slerp(posterRotation,frame.withdraw);
+    }
     if(reveal>0){
       scale=THREE.MathUtils.lerp(scale,lineupScale,reveal);
-      model.position.lerp(lineupPosition.set(offset*(mobile?frustumW*.29:frustumW*.132),frustumH*(mobile?.09:.035)+offset*lineupScale*.105+frustumH*exit,-Math.abs(offset)*.08),reveal);
-      lineupRotation.setFromEuler(poseEuler.set(.31,Math.PI*2+offset*.12,.18,'ZYX'));
+      const rowPose=lineupPose(offset,mobile);
+      model.position.lerp(lineupPosition.set(rowPose.x*frustumW,rowPose.y*frustumH+frustumH*exit,rowPose.depth),reveal);
+      lineupRotation.setFromEuler(poseEuler.set(rowPose.pitch,Math.PI*2+rowPose.yaw,rowPose.roll,'ZYX'));
       model.quaternion.slerp(lineupRotation,reveal);
     }
-    model.scale.setScalar(Math.max(.0001,scale));model.visible=scale>.01&&(isSelected||entry<.7||reveal>.01);
+    model.scale.setScalar(Math.max(.0001,scale));model.visible=scale>.01&&(isSelected||entry<.7||reveal>.01)&&(Math.abs(offset)<3.5||reveal>.01);
     const material=model.userData.material;
-    material.emissive.copy(flavorColor).lerp(neutral,.42);
-    material.emissiveIntensity=isSelected?beat.focus*2.6:0;
+    material.emissive.copy(flavorColor).lerp(neutral,.075);
+    material.emissiveIntensity=isSelected?beat.focus*2.2:0;
     material.userData.focusCenter.value=1-(910+290*beat.scan)/2048;
-    material.color.setScalar(THREE.MathUtils.lerp(.64+.36*focus,1,reveal));
-    material.envMapIntensity=(.55+.5*focus)*(1-beat.focus*.84);
+    material.color.setScalar(THREE.MathUtils.lerp(.32+.68*focus,1,reveal));
+    material.envMapIntensity=(.35+.7*focus)*(1-beat.focus*.88);
     material.clearcoat=.18*(1-beat.focus*.9);
     const explode=focus*(1-entry)*(1-reveal);
     // Detached ends keep their own world orientation, then align with the shell as they close.
@@ -367,9 +392,9 @@ try{
   scene=new THREE.Scene();camera=new THREE.PerspectiveCamera(31,1,.1,50);camera.position.set(0,0,11);
   await nextPaint();lighting();brushed=brushedMetal();
   trimMaterial=new THREE.MeshStandardMaterial({color:'#ffffff',vertexColors:true,side:THREE.DoubleSide,metalness:.95,roughness:.3,envMapIntensity:1.25,bumpMap:brushed,bumpScale:.0012});
-  await document.fonts.load('400 40px "VYRA Can"');
+  await Promise.all([document.fonts.load('400 40px "VYRA Can"'),document.fonts.load('400 40px "VYRA Display"')]);
   for(let i=0;i<5;i++){artworks.push(label(i));renderer.initTexture(artworks[i].color);renderer.initTexture(artworks[i].surface);renderer.initTexture(artworks[i].glow);await nextPaint();}
-  for(let i=-3;i<=3;i++){const model=can(i);model.userData.logical=i;applyArtwork(model,i);scene.add(model);models.push(model);}
+  for(let i=-5;i<=5;i++){const model=can(i);model.userData.logical=i;applyArtwork(model,i);scene.add(model);models.push(model);}
   measure();state.scroll=clamp((scrollY-top)/range);last=performance.now();
   await renderer.compileAsync(scene,camera);state.position=state.index;requestAnimationFrame(draw);
   addEventListener('resize',measure);

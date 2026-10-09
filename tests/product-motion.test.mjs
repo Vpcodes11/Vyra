@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {carouselPose} from '../dist/product-motion.js';
+import {carouselPose,lineupPose} from '../dist/product-motion.js';
 
 test('turning remains continuous across former rounding boundaries',()=>{
   for(const offset of [-1.5,-.99,-.5,0,.5,.99,1.5]){
@@ -24,4 +24,14 @@ test('the selected can moves forward and exposes both tilt and turning axes',()=
 
 test('reduced motion removes drifting, input parallax and independent spinning',()=>{
   assert.deepEqual(carouselPose(0,0,0,0,0,false),carouselPose(0,0,500,.5,.5,false,2));
+});
+
+test('the closing collection recedes in depth and exposes different ends',()=>{
+  const left=lineupPose(-5),center=lineupPose(0),right=lineupPose(5);
+  assert.ok(left.x<center.x&&center.x<right.x);
+  assert.ok(left.depth>center.depth&&center.depth>right.depth);
+  assert.ok(left.pitch<0&&right.pitch>0);
+  for(let offset=-5;offset<=5;offset++){
+    for(const value of Object.values(lineupPose(offset)))assert.ok(Number.isFinite(value));
+  }
 });

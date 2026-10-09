@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {experienceBeat, chapterStops} from '../dist/experience-timeline.js';
+import {experienceBeat, chapterStops, cinemaFrame} from '../dist/experience-timeline.js';
 
 test('chapter links land on the corresponding held label area', () => {
   chapterStops.forEach((stop, index) => {
@@ -38,4 +38,16 @@ test('the closing lineup restores light and stays visible until the exit', () =>
     assert.equal(beat.lineup, 1);
   }
   assert.deepEqual(experienceBeat(-1), experienceBeat(0));
+});
+
+test('the isolated pullback completes before supporting cans return',()=>{
+  const beat=experienceBeat(.847),frame=cinemaFrame(.847);
+  assert.equal(frame.withdraw,1);
+  assert.equal(beat.lineup,0);
+  assert.equal(beat.focus,0);
+  assert.equal(beat.copy,0);
+  assert.equal(beat.returnTurn,1);
+  assert.equal(cinemaFrame(chapterStops[1]).track,0);
+  assert.equal(cinemaFrame(chapterStops[2]).track,1);
+  assert.equal(cinemaFrame(chapterStops[3]).track,2);
 });

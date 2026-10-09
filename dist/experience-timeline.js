@@ -10,7 +10,16 @@ export function experienceBeat(progress) {
     scan: smooth((p - 0.41) / 0.055) + smooth((p - 0.57) / 0.055),
     turn: smooth((p - 0.16) / 0.13),
     returnTurn: smooth((p - 0.75) / 0.09),
-    lineup: smooth((p - 0.82) / 0.10),
+    lineup: smooth((p - 0.86) / 0.07),
     copy: 1 - smooth((p - 0.77) / 0.055),
+  };
+}
+
+// A distinct full-can pullback precedes the collection reveal.
+export function cinemaFrame(progress) {
+  const p=clamp(progress),beat=experienceBeat(p);
+  return {
+    track:beat.scan*beat.focus,
+    withdraw:smooth((p-.745)/.095)
   };
 }

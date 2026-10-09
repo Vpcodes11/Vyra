@@ -40,7 +40,7 @@ function selectFlavor(index){
   $('#detail-description').textContent=f.description;$('#detail-flavor').textContent=f.name;
   $('#flavor-notes').replaceChildren(...f.notes.map(note=>{const span=document.createElement('span');span.textContent=note;return span;}));
   document.querySelectorAll('.flavor-dot').forEach((el,i)=>el.setAttribute('aria-pressed',String(i===selected)));
-  const gap=innerWidth<=900 ? innerHeight/(2*Math.tan(31*Math.PI/360)*11)*1.18 : innerWidth*.16;
+  const gap=innerWidth<=900 ? innerHeight/(2*Math.tan(31*Math.PI/360)*11)*1.26 : innerWidth*.175;
   document.querySelectorAll('.can').forEach(el=>{
     const slot=Number(el.dataset.slot),fi=wrap(selected+slot),active=slot===0;
     const depth=carouselPose(slot,visualIndex+slot,0,0,0,false).depth;

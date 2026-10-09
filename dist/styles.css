@@ -1,7 +1,7 @@
 @font-face{font-family:'VYRA Display';src:url('assets/anton.ttf') format('truetype');font-display:swap}
 @font-face{font-family:'VYRA Can';src:url('assets/RacingSansOne-Regular.ttf') format('truetype');font-display:swap}
 @property --light-color{syntax:'<color>';inherits:true;initial-value:#5435c8}
-:root{color-scheme:dark;--ink:#0c0b10;--paper:#eeece3;--muted:#b4afbb;--accent:#b49aff;--light-color:#5435c8;--rgb:143,97,255;--hue:0deg;--px:0px;--py:0px;--hero-exit:0;--studio-color-strength:.78;--studio-base-strength:.5;--copy-visibility:1;--lineup-visibility:0;--display:'Arial Black',Arial,sans-serif;transition:--light-color .85s ease}
+:root{color-scheme:dark;--ink:#0c0b10;--paper:#eeece3;--muted:#b4afbb;--accent:#b49aff;--light-color:#5435c8;--rgb:143,97,255;--hue:0deg;--px:0px;--py:0px;--hero-exit:0;--studio-color-strength:.22;--studio-base-strength:1;--copy-visibility:1;--lineup-visibility:0;--display:'Arial Black',Arial,sans-serif;transition:--light-color .85s ease}
 *{box-sizing:border-box}
 html{scroll-behavior:smooth;scroll-padding-top:80px}
 body{margin:0;background:var(--ink);color:var(--paper);font-family:Arial,Helvetica,sans-serif;-webkit-font-smoothing:antialiased}
@@ -110,3 +110,13 @@ button:focus-visible,a:focus-visible,summary:focus-visible,.stage:focus-visible{
 @media(max-width:900px){.hero-eyebrow{display:none}}
 @media(max-height:740px) and (min-width:901px){.hero-eyebrow,.edition{top:112px}.selection{bottom:39px}.flavor-title h2{font-size:25px}.hero-footer{bottom:10px}.chapter-label{top:17%}}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*:before,*:after{transition:none!important;animation:none!important}}
+
+/* Reference-driven finishing: compact editorial type and a quieter selector. */
+.copy-panel h2{font-family:'VYRA Display',Arial,sans-serif;font-weight:400;letter-spacing:-.015em;line-height:1.02;font-size:clamp(38px,4.1vw,64px)}
+.flavor-title h2{font-family:'VYRA Display',Arial,sans-serif;font-weight:400;letter-spacing:.1px;font-size:30px;line-height:.97}
+.selection{width:285px;bottom:46px}
+.flavor-dots{width:245px}
+.lineup-copy h2{font-family:'VYRA Display',Arial,sans-serif;font-weight:400;letter-spacing:-.01em}
+.copy-panel p{font-size:13px;line-height:1.65;max-width:290px}
+@media(max-width:900px){.selection{bottom:64px;width:265px}.flavor-title h2{font-size:28px}.copy-panel h2{font-size:38px;line-height:.99}.copy-panel p{font-size:13px;line-height:1.55}.lineup-copy h2{font-size:31px}}
+@media(max-width:380px){.copy-panel h2{font-size:34px}.copy-panel p{font-size:12px}}
