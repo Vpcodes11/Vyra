@@ -4,8 +4,8 @@ import {clamp,smooth,experienceBeat} from './experience-timeline.js';
 
 const started=performance.now();
 const state={index:0,position:0,scroll:0,motion:!matchMedia('(prefers-reduced-motion: reduce)').matches,pointer:new THREE.Vector2(),pointerTarget:new THREE.Vector2()};
-const colors=['#6650ce','#bc1959','#b7bb48','#329c89','#c77836'];
-const lacquer=['#45405b','#583a47','#484b30','#345449','#5a4736'];
+const colors=['#8555ff','#ef2879','#d5db39','#16c5a2','#f78d35'];
+const lacquer=['#4b376e','#6a2948','#53551e','#235d50','#694125'];
 const names=['MIDNIGHT LYCHEE','RASPBERRY RUSH','CITRUS STATIC','MINT CURRENT','APRICOT AFTERGLOW'];
 const headings=['BRIGHT BY NATURE','A FRESH PERSPECTIVE','THE AFTERHOURS EDITION'];
 const backCopy=[['Fruit-inspired flavor.','A fine, lively sparkle.'],['A little unexpected.','Completely unmistakable.'],['Cold can. Fresh perspective.','Make the moment yours.']];
@@ -21,9 +21,11 @@ const nextPaint=()=>new Promise(resolve=>requestAnimationFrame(()=>setTimeout(re
 
 function label(index){
   // Color and material maps are painted together; there is no pixel scanning,
-  // baked reflection or luminous print. Studio lights illuminate the actual ink.
+  // baked reflection. A separate print mask adds only the focused text halo.
   const c=document.createElement('canvas');c.width=1024;c.height=2048;
   const surface=document.createElement('canvas');surface.width=512;surface.height=1024;
+  const glow=document.createElement('canvas');glow.width=512;glow.height=1024;
+  const gc=glow.getContext('2d');gc.fillStyle='#000';gc.fillRect(0,0,512,1024);gc.scale(.25,.5);
   const ctx=c.getContext('2d'),mc=surface.getContext('2d');ctx.scale(.5,1);mc.scale(.25,.5);
   ctx.fillStyle=lacquer[index];ctx.fillRect(0,0,2048,2048);
   mc.fillStyle='rgb(0,61,225)';mc.fillRect(0,0,2048,2048);
@@ -55,6 +57,11 @@ function label(index){
     text(String(i+1).padStart(2,'0'),1274,y,'bold 25px Arial',ink);
     text(heading,1536,y,'bold 37px Arial',ink);
     backCopy[i].forEach((line,j)=>text(line,1536,y+61+j*38,'28px Arial','#c4bec8'));
+    // Soft ink-shaped halo stays attached to the curved label, with no fullscreen bloom pass.
+    gc.textAlign='center';gc.shadowColor='#fff';gc.shadowBlur=9;
+    gc.fillStyle='#fff';gc.font='bold 37px Arial';gc.fillText(heading,1536,y);
+    gc.shadowBlur=5;gc.fillStyle='#bcbcbc';gc.font='28px Arial';
+    backCopy[i].forEach((line,j)=>gc.fillText(line,1536,y+61+j*38));
     for(const [context,color] of [[ctx,'#615b68'],[mc,'rgb(0,145,22)']]){
       context.fillStyle=color;context.fillRect(1270,y+132,532,1.5);
     }
@@ -63,7 +70,8 @@ function label(index){
   text('250 ML',1536,1840,'bold 26px Arial');
   const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;t.anisotropy=4;
   const mask=new THREE.CanvasTexture(surface);mask.anisotropy=4;
-  return {color:t,surface:mask};
+  const halo=new THREE.CanvasTexture(glow);halo.colorSpace=THREE.SRGBColorSpace;halo.anisotropy=4;
+  return {color:t,surface:mask,glow:halo};
 }
 function brushedMetal(){
   const c=document.createElement('canvas');c.width=c.height=256;
@@ -74,10 +82,26 @@ function brushedMetal(){
   }
   const texture=new THREE.CanvasTexture(c);texture.wrapS=texture.wrapT=THREE.RepeatWrapping;texture.repeat.set(4,4);return texture;
 }
+function focusedPrint(material){
+  const center={value:1-910/2048};
+  material.userData.focusCenter=center;
+  material.onBeforeCompile=shader=>{
+    shader.uniforms.vyraFocusCenter=center;
+    shader.fragmentShader='uniform float vyraFocusCenter;\n'+shader.fragmentShader;
+    shader.fragmentShader=shader.fragmentShader.replace('#include <emissivemap_fragment>',`
+      #include <emissivemap_fragment>
+      #ifdef USE_EMISSIVEMAP
+        float labelDistance=(vEmissiveMapUv.y-vyraFocusCenter)/0.043;
+        totalEmissiveRadiance*=exp(-0.5*labelDistance*labelDistance);
+      #endif
+    `);
+  };
+  material.customProgramCacheKey=()=> 'vyra-focused-print-v1';
+}
 function applyArtwork(model,logical){
   const index=wrap(logical);if(model.userData.flavor===index)return;
   const artwork=artworks[index],material=model.userData.material;
-  material.map=artwork.color;material.metalnessMap=material.roughnessMap=artwork.surface;
+  material.map=artwork.color;material.emissiveMap=artwork.glow;material.metalnessMap=material.roughnessMap=artwork.surface;
   model.userData.flavor=index;
 }
 // Merge stampings by material, preserving independent lid/base transforms.
@@ -105,7 +129,7 @@ function can(index){
   if(template){
     const data=template.userData;template.userData={};
     const g=template.clone(true);template.userData=data;
-    const material=template.userData.material.clone();
+    const material=template.userData.material.clone();focusedPrint(material);
     g.children[0].material=material;
     g.userData={material,lid:g.getObjectByName('lid'),bottom:g.getObjectByName('bottom'),logical:index,flavor:-1};
     applyArtwork(g,index);return g;
@@ -116,8 +140,8 @@ function can(index){
   // Lathe's default UVs space profile points equally; labels need real height.
   for(let i=0;i<geometry.attributes.uv.count;i++)geometry.attributes.uv.setY(i,(geometry.attributes.position.getY(i)+1.75)/3.44);
   const artwork=artworks[wrap(index)];
-  const material=new THREE.MeshPhysicalMaterial({map:artwork.color,metalnessMap:artwork.surface,roughnessMap:artwork.surface,metalness:1,roughness:1,clearcoat:.32,clearcoatRoughness:.24,envMapIntensity:1,bumpMap:brushed,bumpScale:.00045});
-  g.add(new THREE.Mesh(geometry,material));
+  const material=new THREE.MeshPhysicalMaterial({map:artwork.color,emissiveMap:artwork.glow,emissive:'#ffffff',emissiveIntensity:0,metalnessMap:artwork.surface,roughnessMap:artwork.surface,metalness:1,roughness:1,clearcoat:.32,clearcoatRoughness:.24,envMapIntensity:1,bumpMap:brushed,bumpScale:.00045});
+  focusedPrint(material);g.add(new THREE.Mesh(geometry,material));
   const metal=new THREE.MeshPhysicalMaterial({color:'#aeb5b9',metalness:1,roughness:.23,clearcoat:.08,clearcoatRoughness:.3,envMapIntensity:1.5,bumpMap:brushed,bumpScale:.0007});
   const satinMetal=new THREE.MeshStandardMaterial({color:'#9aa0a3',metalness:.92,roughness:.34,envMapIntensity:1.1,bumpMap:brushed,bumpScale:.00045});
   const lid=new THREE.Group();lid.name='lid';
@@ -203,17 +227,17 @@ function draw(now){
   const selected=wrap(state.index),reveal=beat.lineup;
   flavorColor.set(colors[selected]);accentLight.color.lerp(flavorColor,damping);
   flavorSpot.color.copy(neutral).lerp(flavorColor,.24);
-  softbox.intensity=3.2*(1-beat.focus*.94);
-  edgeLight.intensity=5*(1-beat.focus*.9);
-  ceilingLight.intensity=3*(1-beat.focus*.93);
+  softbox.intensity=3.7*(1-beat.focus*.96);
+  edgeLight.intensity=6.5*(1-beat.focus*.93);
+  ceilingLight.intensity=3.6*(1-beat.focus*.95);
   ambientLight.intensity=.18*(1-beat.focus*.85);
-  accentLight.intensity=1.7*(1-beat.focus*.85);
+  accentLight.intensity=3.4*(1-beat.focus*.91);
   flavorSpot.intensity=beat.focus*105;
   trimMaterial.envMapIntensity=1.25*(1-beat.focus*.76);
   const style=[entry,beat.focus,reveal,beat.copy].map(v=>v.toFixed(3)).join('/');
   if(style!==lastStyle){
-    setStyle('--studio-color-strength',(.12+entry*.94)*(1-beat.focus*.48)*(1-reveal*.9));
-    setStyle('--studio-base-strength',1-entry*.78*(1-reveal));
+    setStyle('--studio-color-strength',(.78+entry*.38)*(1-beat.focus*.86)*(1-reveal*.28));
+    setStyle('--studio-base-strength',.5*(1-entry*.6)*(1-beat.focus*.75));
     setStyle('--copy-visibility',smooth((entry-.6)/.4)*beat.copy);
     setStyle('--lineup-visibility',smooth((reveal-.28)/.5));
     setStyle('--focus-dim',beat.focus);lastStyle=style;
@@ -253,7 +277,10 @@ function draw(now){
     }
     model.scale.set(Math.max(.0001,scale*1.36),Math.max(.0001,scale),Math.max(.0001,scale*1.36));model.visible=scale>.01&&(isSelected||entry<.7||reveal>.01);
     const material=model.userData.material;
-    material.color.setScalar(THREE.MathUtils.lerp(.55+.45*focus,1,reveal));
+    material.emissive.copy(flavorColor).lerp(neutral,.42);
+    material.emissiveIntensity=isSelected?beat.focus*2.6:0;
+    material.userData.focusCenter.value=1-(910+290*beat.scan)/2048;
+    material.color.setScalar(THREE.MathUtils.lerp(.64+.36*focus,1,reveal));
     material.envMapIntensity=(.55+.5*focus)*(1-beat.focus*.84);
     material.clearcoat=.32*(1-beat.focus*.94);
     const explode=focus*(1-entry)*(1-reveal);
@@ -292,7 +319,7 @@ try{
   await nextPaint();lighting();brushed=brushedMetal();
   trimMaterial=new THREE.MeshStandardMaterial({color:'#ffffff',vertexColors:true,metalness:.95,roughness:.27,envMapIntensity:1.25,bumpMap:brushed,bumpScale:.0006});
   await document.fonts.load('400 40px "VYRA Can"');
-  for(let i=0;i<5;i++){artworks.push(label(i));renderer.initTexture(artworks[i].color);renderer.initTexture(artworks[i].surface);await nextPaint();}
+  for(let i=0;i<5;i++){artworks.push(label(i));renderer.initTexture(artworks[i].color);renderer.initTexture(artworks[i].surface);renderer.initTexture(artworks[i].glow);await nextPaint();}
   for(let i=-3;i<=3;i++){const model=can(i);model.userData.logical=i;applyArtwork(model,i);scene.add(model);models.push(model);}
   measure();state.scroll=clamp((scrollY-top)/range);last=performance.now();
   await renderer.compileAsync(scene,camera);state.position=state.index;requestAnimationFrame(draw);

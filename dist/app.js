@@ -1,10 +1,10 @@
 'use strict';
 import {experienceBeat, chapterStops} from './experience-timeline.js';
 const flavors = [
-  {glow:'#5435c8',name:'MIDNIGHT LYCHEE',lines:['MIDNIGHT','LYCHEE'],color:'#b49aff',rgb:'143,97,255',hue:0,notes:['FLORAL','BRIGHT','CRISP'],description:'Soft lychee. A flash of citrus. A bright, sparkling finish that takes the night somewhere new.'},
+  {glow:'#743cff',name:'MIDNIGHT LYCHEE',lines:['MIDNIGHT','LYCHEE'],color:'#b49aff',rgb:'143,97,255',hue:0,notes:['FLORAL','BRIGHT','CRISP'],description:'Soft lychee. A flash of citrus. A bright, sparkling finish that takes the night somewhere new.'},
   {glow:'#e5005e',name:'RASPBERRY RUSH',lines:['RASPBERRY','RUSH'],color:'#ff7bb7',rgb:'241,16,110',hue:55,notes:['BERRY','TART','ELECTRIC'],description:'A burst of raspberry with a sharp, juicy edge. Bold from the first sip, bright to the very last.'},
-  {glow:'#9da622',name:'CITRUS STATIC',lines:['CITRUS','STATIC'],color:'#dded8b',rgb:'184,196,39',hue:185,notes:['ZESTY','SHARP','VIVID'],description:'Lemon and lime in perfect tension. A wave of citrus with a sparkling, dry finish.'},
-  {glow:'#009e82',name:'MINT CURRENT',lines:['MINT','CURRENT'],color:'#75e2c3',rgb:'18,182,137',hue:250,notes:['COOL','FRESH','CLEAN'],description:'Cool mint meets a quiet hint of cucumber. A fresh current running through every sparkling sip.'},
+  {glow:'#bdcc22',name:'CITRUS STATIC',lines:['CITRUS','STATIC'],color:'#dded8b',rgb:'184,196,39',hue:185,notes:['ZESTY','SHARP','VIVID'],description:'Lemon and lime in perfect tension. A wave of citrus with a sparkling, dry finish.'},
+  {glow:'#00bd91',name:'MINT CURRENT',lines:['MINT','CURRENT'],color:'#75e2c3',rgb:'18,182,137',hue:250,notes:['COOL','FRESH','CLEAN'],description:'Cool mint meets a quiet hint of cucumber. A fresh current running through every sparkling sip.'},
   {glow:'#d76826',name:'APRICOT AFTERGLOW',lines:['APRICOT','AFTERGLOW'],color:'#ffc482',rgb:'230,119,36',hue:125,notes:['MELLOW','JUICY','GOLDEN'],description:'Sun-ripe apricot with a little citrus lift. Soft stone fruit, a bright sparkle, and a golden finish.'}
 ];
 const $ = s => document.querySelector(s);

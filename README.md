@@ -12,8 +12,8 @@ Run `npm start` in this folder and open `http://127.0.0.1:3000/`. Serve `dist` o
 
 - Seven visible carousel positions wrap through five original flavors. Selected-product emphasis, varied depth and rotation, detachable modeled lids and bases, restrained parallax and damped transitions.
 - Formed can shoulders, rolled seams, recessed lid stampings, an extruded pull tab and rivet, and a domed base. Printed ink and lacquer use separate roughness and metalness values. Reflections come from the studio environment and area lights.
-- One continuous backdrop carries the homepage into the close-up without a section boundary. Supporting cans move offstage rather than shrinking into visible fragments.
-- Four product chapters share a single scroll timeline with the renderer. Three reading holds illuminate successive back-label areas with a real projected spotlight. The ink has no emissive glow. The camera gently tracks and enlarges the can during these moments.
+- One continuous backdrop carries the homepage into the close-up without a section boundary. Rich flavor color and stronger metallic highlights return outside the dark reading sequence. Supporting cans move offstage rather than shrinking into visible fragments.
+- Four product chapters share a single scroll timeline with the renderer. Three reading holds illuminate successive back-label areas with a real projected spotlight. A soft flavor-tinted glow follows only the current text area, fading away as the spotlight moves. The halo is sampled on the curved can surface without a fullscreen bloom pass. The camera gently tracks and enlarges the can during these moments.
 - The can turns to its front and pulls back into a complete lineup, which remains visible before the FAQ.
 - Desktop scroll experience spans 6.2 viewport heights; mobile spans 5.8. Mobile copy sits below the product, leaving room for its focused label.
 - Swipe/drag, arrow buttons, flavor dots, Left/Right/Home/End keys, chapter shortcuts, semantic FAQ, visible keyboard focus, skip link, reduced-motion preference and a persistent motion toggle.
@@ -24,7 +24,7 @@ VYRA is a fictional design concept. It has no checkout or manufactured formula.
 
 The seven can models share stamping geometry, metal materials and five label sets. Stampings are merged into one draw per independently moving part. A full desktop carousel uses 28 draw calls; a single close-up uses four. Its geometry stays below 100,000 triangles.
 
-Label color maps are 1024×2048, with shared 512×1024 surface maps. These are painted directly, without scanning image pixels or rebuilding textures while scrolling. The reflection environment uses a 128px cube. Shader programs compile asynchronously before the first rendered frame replaces the fallback artwork.
+Label color maps are 1024×2048, with shared 512×1024 surface and focused-print maps. These are painted directly, without scanning image pixels or rebuilding textures while scrolling. The reflection environment uses a 128px cube. Shader programs compile asynchronously before the first rendered frame replaces the fallback artwork.
 
 Rendering uses a capped pixel ratio (1.35 desktop, 1.1 mobile), up to 60 fps during interaction and 30 while settled. Hidden tabs and sections beyond the product experience stop rendering. Scroll measurements are cached when the viewport changes.
 

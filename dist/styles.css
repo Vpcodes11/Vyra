@@ -1,7 +1,7 @@
 @font-face{font-family:'VYRA Display';src:url('assets/anton.ttf') format('truetype');font-display:swap}
 @font-face{font-family:'VYRA Can';src:url('assets/RacingSansOne-Regular.ttf') format('truetype');font-display:swap}
 @property --light-color{syntax:'<color>';inherits:true;initial-value:#5435c8}
-:root{color-scheme:dark;--ink:#0c0b10;--paper:#eeece3;--muted:#b4afbb;--accent:#b49aff;--light-color:#5435c8;--rgb:143,97,255;--hue:0deg;--px:0px;--py:0px;--hero-exit:0;--studio-color-strength:.12;--copy-visibility:1;--lineup-visibility:0;--display:'Arial Black',Arial,sans-serif;transition:--light-color .85s ease}
+:root{color-scheme:dark;--ink:#0c0b10;--paper:#eeece3;--muted:#b4afbb;--accent:#b49aff;--light-color:#5435c8;--rgb:143,97,255;--hue:0deg;--px:0px;--py:0px;--hero-exit:0;--studio-color-strength:.78;--studio-base-strength:.5;--copy-visibility:1;--lineup-visibility:0;--display:'Arial Black',Arial,sans-serif;transition:--light-color .85s ease}
 *{box-sizing:border-box}
 html{scroll-behavior:smooth;scroll-padding-top:80px}
 body{margin:0;background:var(--ink);color:var(--paper);font-family:Arial,Helvetica,sans-serif;-webkit-font-smoothing:antialiased}
@@ -16,7 +16,7 @@ button:focus-visible,a:focus-visible,summary:focus-visible,.stage:focus-visible{
 .skip-link:focus{top:12px}
 .studio-backdrop{position:fixed;inset:0;z-index:0;pointer-events:none;background:#0d0b14}
 .studio-backdrop:before{content:'';position:absolute;inset:0;opacity:var(--studio-base-strength,1);background:radial-gradient(ellipse at 48% 85%,#77766e 0%,#464348 30%,#211d28 57%,#0f0c17 82%)}
-.studio-aura{position:absolute;inset:0;opacity:var(--studio-color-strength);background:radial-gradient(ellipse at 58% 72%,var(--light-color) 0%,color-mix(in srgb,var(--light-color) 75%,transparent) 31%,transparent 78%)}
+.studio-aura{position:absolute;inset:0;opacity:var(--studio-color-strength);background:radial-gradient(ellipse at 58% 72%,var(--light-color) 0%,color-mix(in srgb,var(--light-color) 85%,transparent) 31%,transparent 78%)}
 .header{height:95px;position:fixed;inset:0 0 auto;z-index:30;padding:25px 4%;display:flex;align-items:center;justify-content:space-between;pointer-events:none}
 .header>*{pointer-events:auto}
 .below-products .header{background:linear-gradient(180deg,#0c0a11 50%,#0c0a11de 80%,transparent)}
