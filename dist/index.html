@@ -7,10 +7,12 @@
   <meta name="description" content="Five flavors. A different frequency. Explore the VYRA Energy collection in an immersive product experience.">
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23110d1c'/%3E%3Cpath d='M6 7h6l4 16 5-16h6L19 27h-7z' fill='%23d2b7ff'/%3E%3C/svg%3E">
   <link rel="stylesheet" href="styles.css">
-  <script src="app.js" defer></script>
+  <link rel="preload" href="assets/RacingSansOne-Regular.ttf" as="font" type="font/ttf" crossorigin>
+  <script type="module" src="app.js"></script>
   <script type="module" src="scene.js"></script>
 </head>
 <body>
+  <div class="studio-backdrop" aria-hidden="true"><div class="studio-aura"></div></div>
   <a class="skip-link" href="#collection">Skip to flavors</a>
   <header class="header">
     <a class="header-link" href="#collection">THE COLLECTION <span class="tiny-star">✳</span></a>
@@ -41,14 +43,16 @@
     <section id="experience" class="experience" aria-label="Explore your selected flavor">
       <div class="experience-sticky">
         <div class="detail-glow" aria-hidden="true"></div><div class="grain" aria-hidden="true"></div>
-        <div class="chapter-label eyebrow">INSIDE THE FREQUENCY <span id="chapter-count">01 / 03</span></div>
+        <div class="chapter-label eyebrow"><span class="chapter-name">INSIDE THE FREQUENCY</span><span id="chapter-count">01 / 04</span></div>
         <div class="detail-copy">
           <article class="copy-panel active" data-chapter="0"><span class="eyebrow">01 — THE FLAVOR</span><h2 id="detail-title">MIDNIGHT<br>LYCHEE</h2><p id="detail-description">Soft lychee. A flash of citrus. A bright, sparkling finish that takes the night somewhere new.</p><div class="flavor-notes" id="flavor-notes"><span>FLORAL</span><span>BRIGHT</span><span>CRISP</span></div></article>
           <article class="copy-panel" data-chapter="1" inert><span class="eyebrow">02 — THE CHARACTER</span><h2>BRIGHT BY<br>NATURE.</h2><p>A little unexpected. Completely unmistakable. Fruit-inspired flavor meets a fine, lively sparkle.</p><div class="detail-rule"></div><span class="small-note">BIG PERSONALITY. A CLEAN FINISH.</span></article>
-          <article class="copy-panel" data-chapter="2" inert><span class="eyebrow">03 — THE RITUAL</span><h2>MAKE IT<br>YOUR MOMENT.</h2><p>Cold can. Fresh perspective. Pick your flavor, turn the volume up, and see where your curiosity takes you.</p><a class="text-link" href="#collection">EXPLORE ALL FIVE FLAVORS</a></article>
+          <article class="copy-panel" data-chapter="2" inert><span class="eyebrow">03 — THE PERSPECTIVE</span><h2>A FRESH<br>PERSPECTIVE.</h2><p>A little unexpected. Completely unmistakable. A different flavor for wherever your curiosity takes you.</p><div class="detail-rule"></div><span class="small-note">SEE WHERE THE NIGHT TAKES YOU.</span></article>
+          <article class="copy-panel" data-chapter="3" inert><span class="eyebrow">04 — THE AFTERHOURS</span><h2>OWN THE<br>MOMENT.</h2><p>Cold can. Fresh perspective. Pick your flavor, turn the volume up, and make the moment yours.</p><a class="text-link" href="#collection">EXPLORE ALL FIVE FLAVORS</a></article>
         </div>
         <div class="detail-product" aria-hidden="true"><div class="detail-can"><img class="detail-front" src="assets/can-front.webp" alt=""><img class="detail-back" src="assets/can-back.webp" alt=""></div><div class="product-shadow"></div></div>
-        <nav class="chapter-nav" aria-label="Product chapters"><button aria-label="The flavor" aria-current="step" data-go="0">✳</button><button aria-label="The character" data-go="1">◈</button><button aria-label="The ritual" data-go="2">✦</button></nav>
+        <nav class="chapter-nav" aria-label="Product chapters"><button aria-label="The flavor" aria-current="step" data-go="0">✳</button><button aria-label="The character" data-go="1">◈</button><button aria-label="The perspective" data-go="2">✦</button><button aria-label="The afterhours" data-go="3">☾</button></nav>
+        <div class="lineup-copy" inert><span class="eyebrow">THE COMPLETE COLLECTION</span><h2>FIVE FLAVORS.<br>ONE FREQUENCY.</h2><a class="text-link" href="#collection">FIND YOUR FLAVOR <span aria-hidden="true">↗</span></a></div>
         <div class="detail-bottom"><a href="#collection">BACK TO COLLECTION</a><span id="detail-flavor">MIDNIGHT LYCHEE</span><span>VYRA / 250 ML</span></div>
       </div>
     </section>

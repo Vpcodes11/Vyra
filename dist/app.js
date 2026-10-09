@@ -1,4 +1,5 @@
 'use strict';
+import {experienceBeat, chapterStops} from './experience-timeline.js';
 const flavors = [
   {glow:'#5435c8',name:'MIDNIGHT LYCHEE',lines:['MIDNIGHT','LYCHEE'],color:'#b49aff',rgb:'143,97,255',hue:0,notes:['FLORAL','BRIGHT','CRISP'],description:'Soft lychee. A flash of citrus. A bright, sparkling finish that takes the night somewhere new.'},
   {glow:'#e5005e',name:'RASPBERRY RUSH',lines:['RASPBERRY','RUSH'],color:'#ff7bb7',rgb:'241,16,110',hue:55,notes:['BERRY','TART','ELECTRIC'],description:'A burst of raspberry with a sharp, juicy edge. Bold from the first sip, bright to the very last.'},
@@ -38,10 +39,10 @@ function selectFlavor(index){
   $('#detail-description').textContent=f.description;$('#detail-flavor').textContent=f.name;
   $('#flavor-notes').replaceChildren(...f.notes.map(note=>{const span=document.createElement('span');span.textContent=note;return span;}));
   document.querySelectorAll('.flavor-dot').forEach((el,i)=>el.setAttribute('aria-pressed',String(i===selected)));
-  const gap=innerWidth<=760 ? 139 : Math.min(innerWidth*.175,280);
+  const gap=innerWidth<=900 ? innerHeight/(2*Math.tan(31*Math.PI/360)*11)*1.18 : innerWidth*.151;
   document.querySelectorAll('.can').forEach(el=>{
     const slot=Number(el.dataset.slot),fi=wrap(selected+slot),active=slot===0;
-    el.classList.toggle('selected',active);el.style.setProperty('--x',slot*gap+'px');
+    el.classList.toggle('selected',active);el.style.setProperty('--x',slot*gap*11/(11+.32*Math.abs(slot)**1.3)+'px');
     el.style.setProperty('--tilt',active?'-16deg':(slot<0?'-5deg':'5deg'));
     el.style.setProperty('--scale',active?1.13: .86-Math.abs(slot)*.025);
     el.style.setProperty('--brightness',active?'1.05':'.34');el.style.setProperty('--opacity',Math.abs(slot)===3?'.7':'1');
@@ -82,13 +83,16 @@ motionQuery.addEventListener('change',e=>{reduced=e.matches;applyMotion();});
 function updateScroll(){
   framePending=false;
   const rect=experience.getBoundingClientRect(),range=Math.max(1,experience.offsetHeight-innerHeight);
+  document.body.classList.toggle('below-products',rect.bottom<100);
   const progress=Math.min(1,Math.max(0,-rect.top/range));
-  const heroExit=Math.min(1,Math.max(0,(innerHeight-rect.top)/(innerHeight*.24)));
+  const heroExit=Math.min(1,Math.max(0,(innerHeight-rect.top)/(innerHeight*.85)));
   const collection=$('#collection');collection.style.setProperty('--hero-exit',heroExit.toFixed(3));collection.classList.toggle('hero-exiting',heroExit>.94);
-  const next=progress<.32?0:progress<.88?1:2;
+  const next=experienceBeat(progress).chapter;
   if(chapter!==next){chapter=next;document.querySelectorAll('.copy-panel').forEach((el,i)=>{el.classList.toggle('active',i===chapter);el.inert=i!==chapter;});
-    document.querySelectorAll('[data-go]').forEach((el,i)=>{if(i===chapter)el.setAttribute('aria-current','step');else el.removeAttribute('aria-current');});$('#chapter-count').textContent='0'+(chapter+1)+' / 03';}
-  const angle=reduced?(chapter===1?180:0):progress<.37?progress/.37*180:progress<.83?180:180+(progress-.83)/.17*180;
+    document.querySelectorAll('[data-go]').forEach((el,i)=>{if(i===chapter)el.setAttribute('aria-current','step');else el.removeAttribute('aria-current');});$('#chapter-count').textContent='0'+(chapter+1)+' / 04';}
+  if(root.classList.contains('webgl-ready'))return;
+  const beat=experienceBeat(progress);
+  const angle=reduced?(chapter>0&&!beat.returnTurn?180:0):180*(beat.turn+beat.returnTurn);
   const tilt=reduced?-12:-16+Math.sin(progress*Math.PI)*25;
   // Front/back render blending retains cylindrical volume at the turn.
   const backAmount=Math.min(1,Math.max(0,((1-Math.cos(angle*Math.PI/180))/2-.35)/.3));
@@ -99,7 +103,7 @@ function updateScroll(){
 addEventListener('scroll',()=>{if(!framePending){framePending=true;requestAnimationFrame(updateScroll);}},{passive:true});
 document.querySelectorAll('[data-go]').forEach(el=>el.addEventListener('click',()=>{
   const i=Number(el.dataset.go),range=experience.offsetHeight-innerHeight;
-  scrollTo({top:experience.offsetTop+range*[.12,.41,.91][i],behavior:reduced?'instant':'smooth'});
+  scrollTo({top:experience.offsetTop+range*chapterStops[i],behavior:reduced?'instant':'smooth'});
 }));
 let resizeTimer;addEventListener('resize',()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(()=>{selectFlavor(selected);updateScroll();},100);});
 const menu=$('#menu'),menuButton=$('.menu-toggle');
@@ -111,5 +115,7 @@ document.addEventListener('click',e=>{if(!menu.hidden&&!menu.contains(e.target)&
 $('#year').textContent=new Date().getFullYear();selectFlavor(0);applyMotion();
 
 
-addEventListener("vyra3dready",()=>{window.vyra3d.select(visualIndex);window.vyra3d.motion(!reduced);});
+const syncScene=()=>{window.vyra3d.select(visualIndex);window.vyra3d.motion(!reduced);};
+addEventListener('vyra3dinit',syncScene);
+addEventListener('vyra3dready',syncScene);
 

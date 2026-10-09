@@ -1,251 +1,302 @@
 import * as THREE from './vendor/three.module.js';
 import {RectAreaLightUniformsLib} from './vendor/addons/RectAreaLightUniformsLib.js';
+import {clamp,smooth,experienceBeat} from './experience-timeline.js';
 
-// Geometry, typography and lighting are original to VYRA. No screenshot crops.
-const state={index:0,position:0,scroll:0,motion:true,pointer:new THREE.Vector2()};
-const colors=['#6150ce','#bb155d','#b3bc35','#239d86','#c57632'];
-const lacquer=['#1a1438','#320d27','#252812','#103027','#342011'];
-let renderer,scene,camera,models=[],environment,accentLight,softbox,edgeLight,ceilingLight,ambientLight,shoulderSpot,flavorSpot,active=true,last=performance.now();
-let firstFrameReady=false;
-let lastRendered=0,lastPointerMove=0;
-const canvas=document.createElement('canvas');canvas.className='product-canvas';canvas.setAttribute('aria-hidden','true');
-canvas.style.opacity='0';
-document.body.append(canvas);
-const experience=document.querySelector('#experience'),sticky=document.querySelector('.experience-sticky');
-let lastFocusStyle='';
+const started=performance.now();
+const state={index:0,position:0,scroll:0,motion:!matchMedia('(prefers-reduced-motion: reduce)').matches,pointer:new THREE.Vector2(),pointerTarget:new THREE.Vector2()};
+const colors=['#6650ce','#bc1959','#b7bb48','#329c89','#c77836'];
+const lacquer=['#45405b','#583a47','#484b30','#345449','#5a4736'];
+const names=['MIDNIGHT LYCHEE','RASPBERRY RUSH','CITRUS STATIC','MINT CURRENT','APRICOT AFTERGLOW'];
+const headings=['BRIGHT BY NATURE','A FRESH PERSPECTIVE','THE AFTERHOURS EDITION'];
+const backCopy=[['Fruit-inspired flavor.','A fine, lively sparkle.'],['A little unexpected.','Completely unmistakable.'],['Cold can. Fresh perspective.','Make the moment yours.']];
+const root=document.documentElement,experience=document.querySelector('#experience');
+const canvas=document.createElement('canvas');canvas.className='product-canvas';canvas.setAttribute('aria-hidden','true');document.body.append(canvas);
+let renderer,scene,camera,environment,softbox,edgeLight,ceilingLight,accentLight,ambientLight,flavorSpot;
+let template,brushed,trimMaterial,models=[],artworks=[],firstFrame=false,active=true,dirty=true,lastRendered=0,last=performance.now(),lastPointer=0;
+let top=0,range=1,end=0,viewH=0,viewW=0,frustumH=0,frustumW=0,lastStyle='';
+const beamTarget=new THREE.Vector3(),beamPosition=new THREE.Vector3();
+const neutral=new THREE.Color('#f2eee9'),flavorColor=new THREE.Color();
+const wrap=n=>((n%5)+5)%5;
 const nextPaint=()=>new Promise(resolve=>requestAnimationFrame(()=>setTimeout(resolve,0)));
 
 function label(index){
-  // The artwork is displayed at under 800 CSS pixels even in the close-up.
-  // Build it at 1024px and keep the two lighting masks at 512px instead of
-  // allocating three 2048px GPU textures for every flavor.
-  const size=1024,maskSize=512;
-  const c=document.createElement('canvas');c.width=c.height=size;const ctx=c.getContext('2d');
-  ctx.scale(size/2048,size/2048);
+  // Color and material maps are painted together; there is no pixel scanning,
+  // baked reflection or luminous print. Studio lights illuminate the actual ink.
+  const c=document.createElement('canvas');c.width=1024;c.height=2048;
+  const surface=document.createElement('canvas');surface.width=512;surface.height=1024;
+  const ctx=c.getContext('2d'),mc=surface.getContext('2d');ctx.scale(.5,1);mc.scale(.25,.5);
   ctx.fillStyle=lacquer[index];ctx.fillRect(0,0,2048,2048);
-  // The reference keeps the face almost black. Flavor color catches the curved
-  // edges as narrow anodized bands; the long white streaks come from softboxes.
-  const color=new THREE.Color(colors[index]);
-  const tint=(amount)=>new THREE.Color(lacquer[index]).lerp(color,amount).getStyle();
-  const edge=ctx.createLinearGradient(0,0,2048,0);
-  for(const [stop,color] of [
-    [0,'#09080d'],[.055,tint(.75)],[.105,tint(.28)],[.18,tint(.12)],
-    [.31,tint(.31)],[.43,tint(.43)],[.52,tint(.3)],[.67,tint(.15)],
-    [.79,tint(.36)],[.92,tint(.7)],[.975,tint(.28)],[1,'#09080d']
-  ]) edge.addColorStop(stop,color);
-  ctx.fillStyle=edge;ctx.fillRect(0,0,2048,2048);
-  // A few restrained, broad reflections live in the finish. The bright studio
-  // panels still come from the real environment map and move with the model.
-  const sheen=ctx.createLinearGradient(0,0,2048,0);
-  for(const [stop,alpha] of [[0,0],[.16,0],[.235,.09],[.27,0],[.72,0],[.78,.075],[.82,0],[1,0]])sheen.addColorStop(stop,`rgba(255,255,255,${alpha})`);
-  ctx.fillStyle=sheen;ctx.fillRect(0,0,2048,2048);
-  ctx.save();ctx.translate(515,1000);ctx.rotate(-Math.PI/2);
-  ctx.fillStyle='#f4f1e8';ctx.textAlign='center';ctx.textBaseline='middle';
-  ctx.font='570px "VYRA Can"';ctx.scale(1470/ctx.measureText('VYRA').width,1.08);ctx.fillText('VYRA',0,0);ctx.restore();
-  ctx.textAlign='center';ctx.fillStyle='#e6d8ee';ctx.font='138px "VYRA Can"';ctx.fillText('ENERGY',515,1835);
-  ctx.font='26px Arial';ctx.fillStyle='#d2c8d5';ctx.fillText('250 ML  /  AFTERHOURS',515,1905);
-  ctx.save();ctx.translate(260,1030);ctx.rotate(-Math.PI/2);ctx.fillStyle=tint(.88);ctx.font='bold 33px Arial';ctx.textAlign='center';ctx.letterSpacing='7px';ctx.fillText(['MIDNIGHT LYCHEE','RASPBERRY RUSH','CITRUS STATIC','MINT CURRENT','APRICOT AFTERGLOW'][index],0,0);ctx.restore();
-  ctx.fillStyle='#d1c7df';ctx.font='italic 130px "VYRA Display"';ctx.fillText('VYRA',1540,520);
-  ctx.font='34px Arial';ctx.fillText('FIND YOUR FREQUENCY',1540,635);
-  const headings=['BRIGHT FLAVOR','A FRESH PERSPECTIVE','THE AFTERHOURS EDITION'];
-  headings.forEach((h,i)=>{ctx.fillStyle=colors[index];ctx.font='bold 40px Arial';ctx.fillText(h,1540,960+i*250);ctx.fillStyle='#a39aaf';ctx.font='24px Arial';ctx.fillText('VYRA ENERGY  /  COLLECTION 01',1540,1025+i*250);});
-  ctx.font='30px Arial';ctx.fillText('250 ML',1540,1850);
-  ctx.font='bold 28px Arial';ctx.fillStyle='#e5dce9';ctx.fillText(['MIDNIGHT LYCHEE','RASPBERRY RUSH','CITRUS STATIC','MINT CURRENT','APRICOT AFTERGLOW'][index],515,1940);
-  const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;t.anisotropy=4;
-  // Ink and lacquer need different reflectance. White print stays readable
-  // while the colored aluminum carries the long studio reflections.
-  const mask=document.createElement('canvas');mask.width=mask.height=maskSize;const mc=mask.getContext('2d');
-  const print=document.createElement('canvas');print.width=print.height=maskSize;const pc=print.getContext('2d');
-  mc.drawImage(c,0,0,maskSize,maskSize);const pixels=mc.getImageData(0,0,maskSize,maskSize);
-  for(let n=0;n<pixels.data.length;n+=4){
-    const r=pixels.data[n],g=pixels.data[n+1],b=pixels.data[n+2];
-    const printInk=Math.max(r,g,b)>160&&Math.max(r,g,b)-Math.min(r,g,b)<38;
-    const v=printInk?75:188;pixels.data[n]=v;pixels.data[n+1]=v;pixels.data[n+2]=v;
+  mc.fillStyle='rgb(0,61,225)';mc.fillRect(0,0,2048,2048);
+  const text=(value,x,y,font,color='#e9e6dd',align='center')=>{
+    for(const [context,ink] of [[ctx,color],[mc,'rgb(0,145,22)']]){
+      context.font=font;context.fillStyle=ink;context.textAlign=align;context.fillText(value,x,y);
+    }
+  };
+  for(const context of [ctx,mc]){
+    context.save();context.translate(518,995);context.rotate(-Math.PI/2);
+    context.font='570px "VYRA Can"';context.textAlign='center';context.textBaseline='middle';
+    context.scale(1430/context.measureText('VYRA').width,1.04);
+    context.fillStyle=context===ctx?'#eeece3':'rgb(0,145,22)';context.fillText('VYRA',0,0);context.restore();
   }
-  // The spotlight texture contains only the lettering. Inferring it from the
-  // colored lacquer caused the entire back panel to glow on bright flavors.
-  pc.fillStyle='#000';pc.fillRect(0,0,maskSize,maskSize);pc.scale(maskSize/2048,maskSize/2048);
-  pc.textAlign='center';pc.fillStyle='#fff';
-  headings.forEach((h,i)=>{pc.font='bold 40px Arial';pc.fillText(h,1540,960+i*250);pc.font='24px Arial';pc.fillText('VYRA ENERGY  /  COLLECTION 01',1540,1025+i*250);});
-  mc.putImageData(pixels,0,0);const metalness=new THREE.CanvasTexture(mask);metalness.anisotropy=4;
-  const emissive=new THREE.CanvasTexture(print);emissive.colorSpace=THREE.SRGBColorSpace;emissive.anisotropy=4;
-  return {color:t,metalness,emissive};
+  text('ENERGY',518,1800,'132px "VYRA Can"',colors[index]);
+  text('250 ML  /  FIND YOUR FREQUENCY',518,1870,'23px Arial');
+  text(names[index],518,1918,'bold 27px Arial');
+  for(const context of [ctx,mc]){
+    context.save();context.translate(255,1020);context.rotate(-Math.PI/2);context.font='bold 38px Arial';context.textAlign='center';
+    context.fillStyle=context===ctx?colors[index]:'rgb(0,145,22)';context.fillText(names[index],0,0);context.restore();
+  }
+  text('VYRA',1536,390,'120px "VYRA Can"');
+  text('FIND YOUR FREQUENCY',1536,458,'26px Arial');
+  text('THE AFTERHOURS COLLECTION',1536,513,'21px Arial','#a09ca6');
+  headings.forEach((heading,i)=>{
+    const y=850+i*290;
+    // Pale flavor ink remains readable under the neutral focused light.
+    const ink=new THREE.Color(colors[index]).lerp(new THREE.Color('#e3ded9'),.64).getStyle();
+    text(String(i+1).padStart(2,'0'),1274,y,'bold 25px Arial',ink);
+    text(heading,1536,y,'bold 37px Arial',ink);
+    backCopy[i].forEach((line,j)=>text(line,1536,y+61+j*38,'28px Arial','#c4bec8'));
+    for(const [context,color] of [[ctx,'#615b68'],[mc,'rgb(0,145,22)']]){
+      context.fillStyle=color;context.fillRect(1270,y+132,532,1.5);
+    }
+  });
+  text('VYRA / COLLECTION 01',1536,1790,'22px Arial','#aaa2b0');
+  text('250 ML',1536,1840,'bold 26px Arial');
+  const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;t.anisotropy=4;
+  const mask=new THREE.CanvasTexture(surface);mask.anisotropy=4;
+  return {color:t,surface:mask};
 }
 function brushedMetal(){
-  const c=document.createElement('canvas');c.width=512;c.height=512;const ctx=c.getContext('2d');const d=ctx.createImageData(512,512);let seed=17;
-  const rnd=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};
-  for(let y=0;y<512;y++){const line=rnd()*18;for(let x=0;x<512;x++){const p=(y*512+x)*4,v=115+line+rnd()*12;d.data[p]=d.data[p+1]=d.data[p+2]=v;d.data[p+3]=255;}}
-  ctx.putImageData(d,0,0);const t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(6,6);return t;
+  const c=document.createElement('canvas');c.width=c.height=256;
+  const ctx=c.getContext('2d');let seed=17;
+  for(let y=0;y<256;y++){
+    seed=(Math.imul(seed,1664525)+1013904223)>>>0;
+    const v=128+(seed%17);ctx.fillStyle=`rgb(${v},${v},${v})`;ctx.fillRect(0,y,256,1);
+  }
+  const texture=new THREE.CanvasTexture(c);texture.wrapS=texture.wrapT=THREE.RepeatWrapping;texture.repeat.set(4,4);return texture;
 }
-const brushed=brushedMetal();
+function applyArtwork(model,logical){
+  const index=wrap(logical);if(model.userData.flavor===index)return;
+  const artwork=artworks[index],material=model.userData.material;
+  material.map=artwork.color;material.metalnessMap=material.roughnessMap=artwork.surface;
+  model.userData.flavor=index;
+}
+// Merge stampings by material, preserving independent lid/base transforms.
+// Supporting cans reuse these buffers rather than rebuilding 3D geometry.
+function mergeStatic(group){
+  const geometries=[];
+  for(const child of [...group.children]){
+    if(!child.isMesh||child===group.children[0]&&group.name!=='lid'&&group.name!=='bottom')continue;
+    child.updateMatrix();let geometry=child.geometry.clone().applyMatrix4(child.matrix);if(geometry.index)geometry=geometry.toNonIndexed();
+    const color=child.material.color,colors=new Float32Array(geometry.attributes.position.count*3);
+    for(let i=0;i<colors.length;i+=3){colors[i]=color.r;colors[i+1]=color.g;colors[i+2]=color.b;}
+    geometry.setAttribute('color',new THREE.BufferAttribute(colors,3));geometries.push(geometry);group.remove(child);
+  }
+  if(geometries.length){
+    const merged=new THREE.BufferGeometry();
+    for(const name of ['position','normal','uv','color']){
+      const size=name==='uv'?2:3,total=geometries.reduce((sum,g)=>sum+g.attributes[name].array.length,0),array=new Float32Array(total);let offset=0;
+      for(const geometry of geometries){array.set(geometry.attributes[name].array,offset);offset+=geometry.attributes[name].array.length;}
+      merged.setAttribute(name,new THREE.BufferAttribute(array,size));
+    }
+    group.add(new THREE.Mesh(merged,trimMaterial));geometries.forEach(g=>g.dispose());
+  }
+}
 function can(index){
+  if(template){
+    const data=template.userData;template.userData={};
+    const g=template.clone(true);template.userData=data;
+    const material=template.userData.material.clone();
+    g.children[0].material=material;
+    g.userData={material,lid:g.getObjectByName('lid'),bottom:g.getObjectByName('bottom'),logical:index,flavor:-1};
+    applyArtwork(g,index);return g;
+  }
   const g=new THREE.Group();
-  const profile=[[-1.75,.40],[-1.73,.422],[-1.70,.438],[-1.66,.443],[-1.61,.456],[-1.55,.47],[-1.49,.475],[1.40,.475],[1.46,.473],[1.51,.464],[1.56,.446],[1.61,.428],[1.65,.423],[1.69,.424]];
-  const geometry=new THREE.LatheGeometry(profile.map(([y,r])=>new THREE.Vector2(r,y)),96,-Math.PI/2);
+  const profile=[[-1.75,.40],[-1.73,.422],[-1.70,.438],[-1.66,.443],[-1.61,.456],[-1.55,.47],[-1.49,.475],[1.37,.475],[1.43,.474],[1.47,.469],[1.51,.461],[1.55,.450],[1.59,.438],[1.62,.429],[1.65,.425],[1.68,.425],[1.70,.429]];
+  const geometry=new THREE.LatheGeometry(profile.map(([y,r])=>new THREE.Vector2(r,y)),72,-Math.PI/2);
   // Lathe's default UVs space profile points equally; labels need real height.
   for(let i=0;i<geometry.attributes.uv.count;i++)geometry.attributes.uv.setY(i,(geometry.attributes.position.getY(i)+1.75)/3.44);
-  const artwork=label(index);
-  const material=new THREE.MeshPhysicalMaterial({map:artwork.color,metalnessMap:artwork.metalness,metalness:.88,roughness:.24,clearcoat:1,clearcoatRoughness:.11,envMapIntensity:1.45,bumpMap:brushed,bumpScale:.00045,emissive:new THREE.Color(colors[index]),emissiveMap:artwork.emissive,emissiveIntensity:0});
-  const textLightY={value:1-1000/2048};
-  material.onBeforeCompile=shader=>{
-    shader.uniforms.textLightY=textLightY;
-    shader.fragmentShader=shader.fragmentShader.replace('#include <emissivemap_fragment>',`#include <emissivemap_fragment>
-      float textBeam = exp(-0.5 * pow((vEmissiveMapUv.y - textLightY) / 0.052, 2.0));
-      totalEmissiveRadiance *= textBeam;`);
-    shader.fragmentShader=shader.fragmentShader.replace('void main() {','uniform float textLightY;\nvoid main() {');
-  };
+  const artwork=artworks[wrap(index)];
+  const material=new THREE.MeshPhysicalMaterial({map:artwork.color,metalnessMap:artwork.surface,roughnessMap:artwork.surface,metalness:1,roughness:1,clearcoat:.32,clearcoatRoughness:.24,envMapIntensity:1,bumpMap:brushed,bumpScale:.00045});
   g.add(new THREE.Mesh(geometry,material));
-  const metal=new THREE.MeshPhysicalMaterial({color:'#aeb5b9',metalness:.69,roughness:.29,clearcoat:.48,clearcoatRoughness:.17,envMapIntensity:1.75,bumpMap:brushed,bumpScale:.0007});
-  const satinMetal=new THREE.MeshStandardMaterial({color:'#9aa0a3',metalness:.43,roughness:.38,envMapIntensity:1.35,bumpMap:brushed,bumpScale:.00045});
-  const lid=new THREE.Group();
-  const disk=new THREE.Mesh(new THREE.CylinderGeometry(.434,.434,.025,80),satinMetal);lid.add(disk);
-  const rim=new THREE.Mesh(new THREE.TorusGeometry(.443,.027,12,96),metal);rim.rotation.x=Math.PI/2;rim.position.y=.018;lid.add(rim);
-  const inset=new THREE.Mesh(new THREE.TorusGeometry(.36,.009,8,80),metal);inset.rotation.x=Math.PI/2;inset.position.y=.025;lid.add(inset);
+  const metal=new THREE.MeshPhysicalMaterial({color:'#aeb5b9',metalness:1,roughness:.23,clearcoat:.08,clearcoatRoughness:.3,envMapIntensity:1.5,bumpMap:brushed,bumpScale:.0007});
+  const satinMetal=new THREE.MeshStandardMaterial({color:'#9aa0a3',metalness:.92,roughness:.34,envMapIntensity:1.1,bumpMap:brushed,bumpScale:.00045});
+  const lid=new THREE.Group();lid.name='lid';
+  const disk=new THREE.Mesh(new THREE.LatheGeometry([new THREE.Vector2(0,-.004),new THREE.Vector2(.2,-.006),new THREE.Vector2(.3,-.014),new THREE.Vector2(.36,-.011),new THREE.Vector2(.405,.01),new THREE.Vector2(.435,.012),new THREE.Vector2(.435,-.014),new THREE.Vector2(.4,-.015)],72),satinMetal);lid.add(disk);
+  const rim=new THREE.Mesh(new THREE.TorusGeometry(.443,.027,8,72),metal);rim.rotation.x=Math.PI/2;rim.position.y=.018;lid.add(rim);
+  const inset=new THREE.Mesh(new THREE.TorusGeometry(.36,.009,8,64),metal);inset.rotation.x=Math.PI/2;inset.position.y=.025;lid.add(inset);
   const tabShape=new THREE.Shape();tabShape.moveTo(-.095,-.13);tabShape.bezierCurveTo(-.145,-.05,-.135,.15,-.06,.21);tabShape.bezierCurveTo(-.02,.24,.06,.23,.09,.18);tabShape.bezierCurveTo(.14,.09,.14,-.06,.095,-.13);tabShape.quadraticCurveTo(0,-.19,-.095,-.13);
   const hole=new THREE.Path();hole.absellipse(0,.06,.067,.11,0,Math.PI*2,true);tabShape.holes.push(hole);
   const tab=new THREE.Mesh(new THREE.ExtrudeGeometry(tabShape,{depth:.015,bevelEnabled:true,bevelSize:.005,bevelThickness:.004,bevelSegments:2,steps:1,curveSegments:16}),metal);tab.rotation.x=-Math.PI/2;tab.position.set(0,.05,.04);lid.add(tab);
   const score=new THREE.Mesh(new THREE.RingGeometry(.255,.26,64),new THREE.MeshBasicMaterial({color:'#596065',side:THREE.DoubleSide}));score.rotation.x=-Math.PI/2;score.position.y=.029;score.scale.y=1.12;lid.add(score);
   const rivet=new THREE.Mesh(new THREE.SphereGeometry(.033,16,8),metal);rivet.scale.y=.3;rivet.position.set(0,.065,.16);lid.add(rivet);
   const opening=new THREE.Mesh(new THREE.RingGeometry(.092,.105,48),new THREE.MeshStandardMaterial({color:'#707276',metalness:.9,roughness:.4}));opening.rotation.x=-Math.PI/2;opening.scale.y=1.45;opening.position.set(0,.022,-.2);lid.add(opening);
-  const recessed=new THREE.Mesh(new THREE.CylinderGeometry(.345,.345,.008,64),satinMetal);recessed.position.y=.018;lid.add(recessed);
   lid.position.y=1.71;g.add(lid);
   // A dark well and a rolled rim remain on the can when the real lid lifts.
-  const openingWell=new THREE.Mesh(new THREE.CylinderGeometry(.395,.395,.012,80),new THREE.MeshPhysicalMaterial({color:'#07080a',metalness:.72,roughness:.48}));openingWell.position.y=1.672;g.add(openingWell);
-  const mouthRim=new THREE.Mesh(new THREE.TorusGeometry(.426,.014,8,96),metal);mouthRim.rotation.x=Math.PI/2;mouthRim.position.y=1.68;g.add(mouthRim);
-  const base=new THREE.Mesh(new THREE.TorusGeometry(.423,.027,12,96),metal);base.rotation.x=Math.PI/2;base.position.y=-1.73;g.add(base);
-  const bottom=new THREE.Group();
-  const foot=new THREE.Mesh(new THREE.CylinderGeometry(.414,.414,.032,80),satinMetal);bottom.add(foot);
-  const footRing=new THREE.Mesh(new THREE.TorusGeometry(.413,.018,10,96),metal);footRing.rotation.x=Math.PI/2;footRing.position.y=.018;bottom.add(footRing);
-  const footInset=new THREE.Mesh(new THREE.CircleGeometry(.32,80),new THREE.MeshStandardMaterial({color:'#858c90',metalness:.38,roughness:.43,envMapIntensity:1.2}));footInset.rotation.x=-Math.PI/2;footInset.position.y=.019;bottom.add(footInset);
-  const footGroove=new THREE.Mesh(new THREE.TorusGeometry(.29,.006,6,80),new THREE.MeshBasicMaterial({color:'#50565a'}));footGroove.rotation.x=Math.PI/2;footGroove.position.y=.024;bottom.add(footGroove);
+  const openingWell=new THREE.Mesh(new THREE.CylinderGeometry(.395,.395,.012,64),new THREE.MeshPhysicalMaterial({color:'#07080a',metalness:.72,roughness:.48}));openingWell.position.y=1.672;g.add(openingWell);
+  const mouthRim=new THREE.Mesh(new THREE.TorusGeometry(.426,.014,8,72),metal);mouthRim.rotation.x=Math.PI/2;mouthRim.position.y=1.68;g.add(mouthRim);
+  const base=new THREE.Mesh(new THREE.TorusGeometry(.423,.027,8,72),metal);base.rotation.x=Math.PI/2;base.position.y=-1.73;g.add(base);
+  const bottom=new THREE.Group();bottom.name='bottom';
+  const foot=new THREE.Mesh(new THREE.LatheGeometry([new THREE.Vector2(0,.065),new THREE.Vector2(.15,.061),new THREE.Vector2(.29,.039),new THREE.Vector2(.36,.008),new THREE.Vector2(.414,0),new THREE.Vector2(.414,-.028)],64),satinMetal);bottom.add(foot);
+  const footRing=new THREE.Mesh(new THREE.TorusGeometry(.413,.018,8,72),metal);footRing.rotation.x=Math.PI/2;footRing.position.y=.018;bottom.add(footRing);
+  const footInset=new THREE.Mesh(new THREE.CircleGeometry(.32,64),new THREE.MeshStandardMaterial({color:'#70767a',metalness:.92,roughness:.32,envMapIntensity:1.2}));footInset.rotation.x=-Math.PI/2;footInset.position.y=.019;bottom.add(footInset);
+  const footGroove=new THREE.Mesh(new THREE.TorusGeometry(.29,.006,6,64),new THREE.MeshBasicMaterial({color:'#50565a'}));footGroove.rotation.x=Math.PI/2;footGroove.position.y=.024;bottom.add(footGroove);
   bottom.position.y=-1.73;g.add(bottom);
-  g.userData={index,material,lid,bottom,textLightY};return g;
+  mergeStatic(lid);mergeStatic(bottom);mergeStatic(g);g.userData={material,lid,bottom,logical:index,flavor:index};template=g;return g;
 }
+
 function lighting(){
-  const room=new THREE.Scene();room.background=new THREE.Color('#08080b');
-  const box=(x,y,z,w,h,color,intensity,ry=0)=>{const m=new THREE.Mesh(new THREE.PlaneGeometry(w,h),new THREE.MeshBasicMaterial({color:new THREE.Color(color).multiplyScalar(intensity),side:THREE.DoubleSide}));m.position.set(x,y,z);m.rotation.y=ry;room.add(m);};
-  box(-4,1,4,1.8,8,'#fff7ec',5.5,.75);box(5,.5,1,.42,9,'#ffffff',6,-.9);box(0,5,2,7,2,'#ffffff',2.5);box(0,-3,4,6,1.5,'#a6a0a6',.6);
-  const pmrem=new THREE.PMREMGenerator(renderer);environment=pmrem.fromScene(room,.035);scene.environment=environment.texture;pmrem.dispose();
-  RectAreaLightUniformsLib.init();ambientLight=new THREE.AmbientLight('#e7e4e6',.3);scene.add(ambientLight);
-  softbox=new THREE.RectAreaLight('#fff8ef',4.5,2.5,7);softbox.position.set(-3,2.8,5);softbox.lookAt(0,0,0);scene.add(softbox);
-  edgeLight=new THREE.RectAreaLight('#ffffff',7,.42,7);edgeLight.position.set(3,.6,-1);edgeLight.lookAt(0,0,0);scene.add(edgeLight);
-  ceilingLight=new THREE.RectAreaLight('#ffffff',3.5,5,1.2);ceilingLight.position.set(0,4.5,2);ceilingLight.lookAt(0,0,0);scene.add(ceilingLight);
-  accentLight=new THREE.RectAreaLight(colors[0],3.5,1.1,7);accentLight.position.set(-2,-.5,2);accentLight.lookAt(0,0,0);scene.add(accentLight);
-  shoulderSpot=new THREE.SpotLight('#fff5ed',18,5,.31,.95,1.5);
-  flavorSpot=new THREE.SpotLight(colors[0],33,5,.34,.95,1.5);
-  scene.add(shoulderSpot,shoulderSpot.target,flavorSpot,flavorSpot.target);
-}
-function resize(){const w=innerWidth,h=innerHeight;renderer.setPixelRatio(Math.min(devicePixelRatio,w<760?1.1:1.2));renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();}
-const smooth=(x)=>{x=THREE.MathUtils.clamp(x,0,1);return x*x*(3-2*x);};
-const follow=(vector,x,y,z,damping)=>{
-  vector.set(THREE.MathUtils.lerp(vector.x,x,damping),THREE.MathUtils.lerp(vector.y,y,damping),THREE.MathUtils.lerp(vector.z,z,damping));
-};
-function draw(now){
-  requestAnimationFrame(draw);if(!active)return;
-  const expRect=experience.getBoundingClientRect();
-  const scrollTarget=THREE.MathUtils.clamp(-expRect.top/(experience.offsetHeight-innerHeight),0,1);
-  const busy=Math.abs(state.index-state.position)>.005||Math.abs(scrollTarget-state.scroll)>.005||now-lastPointerMove<350;
-  if(firstFrameReady&&now-lastRendered<(busy?16:32))return;
-  lastRendered=now;
-  const dt=Math.min((now-last)/1000,.05);last=now;
-  const damping=state.motion?1-Math.exp(-dt*7.5):1;
-  const velocity=state.index-state.position;state.position+=velocity*damping;
-  const selectedIndex=((Math.round(state.index)%5)+5)%5;
-  const flavorColor=new THREE.Color(colors[selectedIndex]);
-  accentLight.color.lerp(flavorColor,damping);
-  flavorSpot.color.lerp(flavorColor,damping);
-  const rect=expRect;
-  if(rect.bottom<=0){if(canvas.style.opacity!=='0')canvas.style.opacity='0';return;}
-  const target=scrollTarget;
-  state.scroll+=(target-state.scroll)*(state.motion?1-Math.exp(-dt*9):1);
-  const mobile=innerWidth<=760,H=innerHeight;
-  const focusWindow=smooth((state.scroll-.27)/.10)*(1-smooth((state.scroll-.79)/.09));
-  const textSweep=THREE.MathUtils.clamp((state.scroll-.39)/.34,0,1);
-  const secondLine=smooth((textSweep-.20)/.15);
-  const thirdLine=smooth((textSweep-.61)/.15);
-  const textLightY=1-(1000+250*secondLine+250*thirdLine)/2048;
-  const lateZoom=smooth((state.scroll-.83)/.17);
-  const focusStyle=focusWindow.toFixed(3);
-  if(focusStyle!==lastFocusStyle){
-    sticky.style.setProperty('--detail-brightness',(1-focusWindow*.48).toFixed(3));
-    sticky.style.setProperty('--focus-dim',focusStyle);
-    lastFocusStyle=focusStyle;
+  const room=new THREE.Scene();room.background=new THREE.Color('#29272d');
+  const panel=(x,y,z,w,h,intensity,angle=0)=>{
+    const mesh=new THREE.Mesh(new THREE.PlaneGeometry(w,h),new THREE.MeshBasicMaterial({color:new THREE.Color('#eeeae4').multiplyScalar(intensity),side:THREE.DoubleSide}));
+    mesh.position.set(x,y,z);mesh.rotation.y=angle;room.add(mesh);return mesh;
+  };
+  panel(-4,1,3,.8,7,3,.75);panel(4,.5,1,.22,8,5,-.9);
+  panel(0,5,0,5,4,3).rotation.x=Math.PI/2;
+  panel(0,-4,0,4,4,1.7).rotation.x=Math.PI/2;
+  panel(0,3.5,-4,3.5,4,1.3);
+  const pmrem=new THREE.PMREMGenerator(renderer);
+  environment=pmrem.fromScene(room,.055,.1,30,{size:128});scene.environment=environment.texture;
+  pmrem.dispose();room.traverse(o=>{o.geometry?.dispose();o.material?.dispose();});
+  RectAreaLightUniformsLib.init();
+  ambientLight=new THREE.AmbientLight('#dddbe2',.18);scene.add(ambientLight);
+  const area=(color,power,w,h,x,y,z)=>{
+    const light=new THREE.RectAreaLight(color,power,w,h);light.position.set(x,y,z);light.lookAt(0,0,0);scene.add(light);return light;
+  };
+  softbox=area('#f6f1e9',3.2,1.15,6,-3,2,4);
+  edgeLight=area('#e5e4ee',5,.24,7,3,.5,1);
+  ceilingLight=area('#f6f4ee',3,4,1.1,0,4,2);
+  accentLight=area(colors[0],1.7,.65,6,-2,0,2);
+  // A soft horizontal gobo shapes a real light on the curved label surface.
+  const c=document.createElement('canvas');c.width=c.height=128;const ctx=c.getContext('2d');
+  const pixels=ctx.createImageData(128,128);
+  for(let y=0;y<128;y++)for(let x=0;x<128;x++){
+    const i=(y*128+x)*4,v=255*Math.exp(-.5*((x-64)/38)**2-.5*((y-64)/12)**2);
+    pixels.data[i]=pixels.data[i+1]=pixels.data[i+2]=v;pixels.data[i+3]=255;
   }
-  const enter=smooth((H-rect.top)/H),exit=Math.min(0,rect.bottom-H)/H;
-  if(firstFrameReady&&canvas.style.opacity!=='1')canvas.style.opacity='1';
-  const visibleHeight=2*Math.tan(THREE.MathUtils.degToRad(camera.fov/2))*camera.position.z;
-  const vw=visibleHeight*camera.aspect;
-  const bob=state.motion?Math.sin(now*.0008)*.045:0;
-  // The reference closes the studio softboxes for a single focused beat,
-  // leaving just a tight flavor-colored beam on the back print.
-  softbox.intensity=4.5*(1-focusWindow*.96);
-  edgeLight.intensity=7*(1-focusWindow*.94);
-  ceilingLight.intensity=3.5*(1-focusWindow*.96);
-  ambientLight.intensity=.3*(1-focusWindow*.9);
-  accentLight.intensity=2.8*(1-focusWindow*.8);
-  shoulderSpot.intensity=18*(1-focusWindow*.96);
-  flavorSpot.intensity=22*(1-focusWindow);
-  flavorSpot.angle=THREE.MathUtils.lerp(.34,.17,focusWindow);
-  models.forEach((m,i)=>{
-    let offset=i-state.position;offset=((offset+2.5)%5+5)%5-2.5;
-    const focus=1-smooth(Math.abs(offset));const selected=i===((Math.round(state.index)%5)+5)%5;
-    const heroHeight=mobile?Math.min(H*.41,360):Math.min(H*(H<950?.40:.45),460);
-    const heroScale=visibleHeight*heroHeight/H/3.5;
-    const detailHeight=mobile?H*.43:Math.min(H*.77,720);
-    const detailScale=visibleHeight*detailHeight/H/3.5*(mobile?1+.15*focusWindow+.08*lateZoom:.92+.24*focusWindow+.45*lateZoom)*(1+.055*textSweep*focusWindow);
-    const gap=mobile?1.05:vw*.185;
-    const x=offset*gap;
-    const heroY=visibleHeight*(mobile?.035:.045)+(.11+(!mobile&&H<760?.12:0))*focus+Math.sin(i*2.2)*.08*(1-focus);
-    const detailX=mobile?vw*.035:vw*(.19+lateZoom*.05);
-    const detailY=visibleHeight*(mobile?.11:-.045*focusWindow-.17*lateZoom+.065*textSweep*focusWindow)+visibleHeight*exit;
-    const t=selected?enter:0;
-    m.position.set(THREE.MathUtils.lerp(x,detailX,t),THREE.MathUtils.lerp(heroY+bob*focus,detailY,t),THREE.MathUtils.lerp(-.55*(1-focus),.5,t));
-    const scl=THREE.MathUtils.lerp(heroScale*(.85+.2*focus),detailScale,t)*(selected?1:1-enter);
-    // Keep the modeled body at the same classic-can aspect ratio as the
-    // artwork shown while WebGL initializes, including through the zoom.
-    m.scale.set(Math.max(.0001,scl*1.36),Math.max(.0001,scl),Math.max(.0001,scl*1.36));m.visible=scl>.01&&rect.bottom>0;
-    // Turn to the back, hold it still while the light reads each line,
-    // then rotate away only after the final line has been featured.
-    const rotation=state.motion?Math.PI*(smooth((state.scroll-.15)/.22)+smooth((state.scroll-.83)/.15)):(target>=.32&&target<.88?Math.PI:0);
-    m.rotation.set(.08,THREE.MathUtils.lerp((1-focus)*Math.PI*.92,rotation,t)+state.pointer.x*.055*focus-velocity*.1,THREE.MathUtils.lerp(.24*focus+Math.sin(i*1.9)*.065*(1-focus),-.1+Math.cos(state.scroll*Math.PI*2)*.34-lateZoom*.55,t)+state.pointer.y*.025*focus+velocity*.025);
-    // The selected object and its reflections move as a single continuous model.
-    m.userData.material.envMapIntensity=(.2+focus*.95+enter*.25)*(1-focusWindow*.91);
-    m.userData.material.color.setScalar(.25+focus*.75-(selected?focusWindow*.78:0));
-    m.userData.material.clearcoat=.3+focus*.65;
-    m.userData.material.emissiveIntensity=selected?focusWindow*3.7:0;
-    m.userData.textLightY.value=textLightY;
-    const explode=focus*(1-enter);
-    m.userData.lid.position.y=1.71+.49*explode;
-    m.userData.lid.rotation.x=.55*explode;
-    m.userData.bottom.position.y=-1.73-.28*explode;
-    m.userData.bottom.rotation.x=.32*explode;
-  });
-  const focusModel=models[selectedIndex],s=focusModel.scale.y;
-  const lightDamping=state.motion?1-Math.exp(-dt*5):1;
-  follow(shoulderSpot.position,focusModel.position.x-s*1.7+state.pointer.x*.18,focusModel.position.y+s*1.4+state.pointer.y*.12,focusModel.position.z+2.7,lightDamping);
-  follow(shoulderSpot.target.position,focusModel.position.x,focusModel.position.y+s*.85,focusModel.position.z,lightDamping);
-  const beamHeight=s*(.18-.39*secondLine-.39*thirdLine);
-  follow(flavorSpot.position,focusModel.position.x+s*(1.6-focusWindow*1.05)-state.pointer.x*.24,focusModel.position.y+beamHeight+s*.3+state.pointer.y*.1,focusModel.position.z+2.4,lightDamping);
-  follow(flavorSpot.target.position,focusModel.position.x,focusModel.position.y+beamHeight,focusModel.position.z,lightDamping);
-  renderer.render(scene,camera);
-  if(!firstFrameReady){firstFrameReady=true;rootReady();canvas.style.opacity='1';}
-  window.vyra3d.stats={calls:renderer.info.render.calls,triangles:renderer.info.render.triangles};
+  ctx.putImageData(pixels,0,0);
+  flavorSpot=new THREE.SpotLight('#eeeaf2',0,12,.34,.72,2);
+  flavorSpot.map=new THREE.CanvasTexture(c);flavorSpot.map.colorSpace=THREE.SRGBColorSpace;
+  scene.add(flavorSpot,flavorSpot.target);
 }
-window.vyra3d={select(index){state.index=index;},motion(value){state.motion=value;if(!value)state.pointer.set(0,0);},stats:{}};
-document.addEventListener('pointermove',e=>{if(e.pointerType==='touch'||!state.motion)return;lastPointerMove=performance.now();state.pointer.set(e.clientX/innerWidth-.5,e.clientY/innerHeight-.5);},{passive:true});
-document.addEventListener('visibilitychange',()=>{active=!document.hidden;last=performance.now();});
+function measure(){
+  viewW=innerWidth;viewH=innerHeight;top=experience.offsetTop;range=Math.max(1,experience.offsetHeight-viewH);end=top+experience.offsetHeight;
+  renderer.setPixelRatio(Math.min(devicePixelRatio,viewW<=900?1.1:1.35));renderer.setSize(viewW,viewH,false);
+  camera.aspect=viewW/viewH;camera.updateProjectionMatrix();
+  frustumH=2*Math.tan(THREE.MathUtils.degToRad(camera.fov/2))*camera.position.z;frustumW=frustumH*camera.aspect;dirty=true;
+}
+function setStyle(name,value){root.style.setProperty(name,value.toFixed(3));}
+function draw(now){
+  if(active)requestAnimationFrame(draw);
+  if(!active)return;
+  const y=scrollY,target=clamp((y-top)/range),mobile=viewW<=900;
+  if(y>end){if(canvas.style.opacity!=='0')canvas.style.opacity='0';return;}
+  const busy=dirty||Math.abs(state.index-state.position)>.002||Math.abs(target-state.scroll)>.0004||now-lastPointer<500;
+  if(firstFrame&&now-lastRendered<(busy?16:33))return;
+  if(!state.motion&&!busy)return;
+  lastRendered=now;dirty=false;
+  const dt=Math.min((now-last)/1000,.05);last=now;
+  const damping=state.motion?1-Math.exp(-dt*9):1;
+  const velocity=state.index-state.position;state.position+=velocity*damping;
+  state.scroll+=(target-state.scroll)*damping;
+  state.pointer.lerp(state.pointerTarget,damping);
+  const beat=experienceBeat(state.scroll),entry=smooth((y-top+viewH)/viewH),exit=Math.min(0,(end-y-viewH)/viewH);
+  const selected=wrap(state.index),reveal=beat.lineup;
+  flavorColor.set(colors[selected]);accentLight.color.lerp(flavorColor,damping);
+  flavorSpot.color.copy(neutral).lerp(flavorColor,.24);
+  softbox.intensity=3.2*(1-beat.focus*.94);
+  edgeLight.intensity=5*(1-beat.focus*.9);
+  ceilingLight.intensity=3*(1-beat.focus*.93);
+  ambientLight.intensity=.18*(1-beat.focus*.85);
+  accentLight.intensity=1.7*(1-beat.focus*.85);
+  flavorSpot.intensity=beat.focus*105;
+  trimMaterial.envMapIntensity=1.25*(1-beat.focus*.76);
+  const style=[entry,beat.focus,reveal,beat.copy].map(v=>v.toFixed(3)).join('/');
+  if(style!==lastStyle){
+    setStyle('--studio-color-strength',(.12+entry*.94)*(1-beat.focus*.48)*(1-reveal*.9));
+    setStyle('--studio-base-strength',1-entry*.78*(1-reveal));
+    setStyle('--copy-visibility',smooth((entry-.6)/.4)*beat.copy);
+    setStyle('--lineup-visibility',smooth((reveal-.28)/.5));
+    setStyle('--focus-dim',beat.focus);lastStyle=style;
+    const lineupCopy=document.querySelector('.lineup-copy');lineupCopy.inert=reveal<.65;
+    document.querySelector('.chapter-nav').inert=beat.copy<.05;
+    document.querySelector('.detail-copy').inert=beat.copy<.05;
+  }
+  if(firstFrame&&canvas.style.opacity!=='1')canvas.style.opacity='1';
+  const heroHeight=mobile?Math.min(viewH*.37,340):Math.min(viewH*.42,455);
+  const heroScale=frustumH*heroHeight/viewH/3.5;
+  const detailHeight=mobile?viewH*(viewH<720?.33:.41):Math.min(viewH*.76,750);
+  const detailScale=frustumH*detailHeight/viewH/3.5*(1+beat.focus*(mobile?.13:.12)+beat.scan*.022*beat.focus);
+  const gap=mobile?1.18:frustumW*.151;
+  const lineupScale=frustumH*(mobile?.29:.43)/3.5;
+  let focusModel;
+  for(const model of models){
+    let logical=model.userData.logical;
+    if(Math.abs(logical-state.position)>3.5){logical+=Math.round((state.position-logical)/7)*7;model.userData.logical=logical;applyArtwork(model,logical);}
+    const offset=logical-state.position,focus=1-smooth(Math.abs(offset)),isSelected=logical===state.index;
+    const bob=state.motion?Math.sin(now*.00065+logical*.7)*.022:0;
+    const heroX=offset*gap,heroY=frustumH*(mobile?.075:.065)+Math.sin(logical*1.8)*.12*(1-focus)+bob;
+    const heroZ=-.32*Math.abs(offset)**1.3;
+    const detailX=mobile?frustumW*.01:frustumW*.19;
+    const detailY=frustumH*(mobile?.145:-.008+beat.scan*.024*beat.focus)+frustumH*exit;
+    const t=isSelected?entry:0;
+    let scale=THREE.MathUtils.lerp(heroScale*(.84+.23*focus),detailScale,t)*(isSelected?1:1-entry*.15);
+    model.position.set(THREE.MathUtils.lerp(heroX*(isSelected?1:1+entry*5),detailX,t),THREE.MathUtils.lerp(heroY,detailY,t),THREE.MathUtils.lerp(heroZ,.25,t));
+    const baseTurn=focus<.99?(Math.abs(Math.round(offset))%2?Math.PI*.92:Math.PI*.18)*Math.sign(offset):0;
+    const rotation=state.motion?Math.PI*(beat.turn+beat.returnTurn):(beat.chapter>0&&!beat.returnTurn?Math.PI:0);
+    model.rotation.set(.09,THREE.MathUtils.lerp(baseTurn,rotation,t)+state.pointer.x*.035*focus-velocity*.1,THREE.MathUtils.lerp(.22*focus+Math.sin(logical*1.9)*.1*(1-focus),.27+beat.scan*.03*beat.focus,t)+velocity*.025,'ZYX');
+    if(reveal>0){
+      scale=THREE.MathUtils.lerp(scale,lineupScale,reveal);
+      model.position.lerp(new THREE.Vector3(offset*(mobile?frustumW*.29:frustumW*.132),frustumH*(mobile?.09:.035)+offset*lineupScale*.105+frustumH*exit,-Math.abs(offset)*.08),reveal);
+      model.rotation.x=THREE.MathUtils.lerp(model.rotation.x,.23,reveal);
+      model.rotation.y=THREE.MathUtils.lerp(model.rotation.y,Math.PI*2+offset*.05,reveal);
+      model.rotation.z=THREE.MathUtils.lerp(model.rotation.z,.16,reveal);
+    }
+    model.scale.set(Math.max(.0001,scale*1.36),Math.max(.0001,scale),Math.max(.0001,scale*1.36));model.visible=scale>.01&&(isSelected||entry<.7||reveal>.01);
+    const material=model.userData.material;
+    material.color.setScalar(THREE.MathUtils.lerp(.55+.45*focus,1,reveal));
+    material.envMapIntensity=(.55+.5*focus)*(1-beat.focus*.84);
+    material.clearcoat=.32*(1-beat.focus*.94);
+    const explode=focus*(1-entry)*(1-reveal);
+    model.userData.lid.position.y=1.71+.62*explode;model.userData.lid.rotation.x=.38*explode;
+    model.userData.bottom.position.y=-1.73-.4*explode;model.userData.bottom.rotation.x=.23*explode;
+    if(isSelected)focusModel=model;
+  }
+  if(focusModel){
+    focusModel.updateMatrixWorld(true);
+    const localY=1.69-(910+290*beat.scan)/2048*3.44;
+    beamTarget.set(0,localY,-.475).applyMatrix4(focusModel.matrixWorld);
+    beamPosition.copy(beamTarget).add(new THREE.Vector3(focusModel.scale.y*2.4,focusModel.scale.y*.1,focusModel.scale.y*1.8));
+    flavorSpot.position.copy(beamPosition);flavorSpot.target.position.copy(beamTarget);
+  }
+  renderer.render(scene,camera);
+  if(!firstFrame){
+    firstFrame=true;root.classList.add('webgl-ready');root.classList.remove('scene-loading');canvas.style.opacity='1';
+    window.dispatchEvent(new Event('vyra3dready'));
+    console.info(`VYRA scene: first 3D frame ${Math.round(performance.now())} ms after navigation; setup ${Math.round(performance.now()-started)} ms; ${renderer.info.render.calls} draw calls; ${renderer.info.render.triangles} triangles.`);
+  }
+}
+window.vyra3d={select(index){state.index=index;dirty=true;},motion(value){state.motion=value;if(!value)state.pointerTarget.set(0,0);dirty=true;}};
+window.dispatchEvent(new Event('vyra3dinit'));
+document.addEventListener('pointermove',event=>{
+  if(event.pointerType==='touch'||!state.motion)return;lastPointer=performance.now();state.pointerTarget.set(event.clientX/viewW-.5,event.clientY/viewH-.5);
+},{passive:true});
+document.addEventListener('visibilitychange',()=>{
+  active=!document.hidden;last=performance.now();dirty=true;if(active)requestAnimationFrame(draw);
+});
+addEventListener('scroll',()=>{dirty=true;},{passive:true});
 try{
-  // Let the lightweight product artwork paint before any WebGL setup work.
-  await nextPaint();
-  renderer=new THREE.WebGLRenderer({canvas,alpha:true,antialias:true,powerPreference:'high-performance'});renderer.setClearColor(0,0);renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.3;
-  scene=new THREE.Scene();camera=new THREE.PerspectiveCamera(31,1,.1,50);camera.position.set(0,0,11);await nextPaint();lighting();
-  await Promise.all([document.fonts.load('400 40px "VYRA Display"'),document.fonts.load('400 40px "VYRA Can"')]);
-  for(let i=0;i<colors.length;i++){const m=can(i);scene.add(m);models.push(m);await nextPaint();}
-  resize();addEventListener('resize',resize);
-  // A restored scroll position must start on the matching product face.
-  state.scroll=THREE.MathUtils.clamp(-experience.getBoundingClientRect().top/(experience.offsetHeight-innerHeight),0,1);
-  canvas.addEventListener('webglcontextlost',event=>{event.preventDefault();active=false;document.documentElement.classList.remove('webgl-ready');document.documentElement.classList.add('webgl-fallback');canvas.style.visibility='hidden';});
-  canvas.addEventListener('webglcontextrestored',()=>{active=true;last=performance.now();canvas.style.visibility='';document.documentElement.classList.remove('webgl-fallback');rootReady();});
-  requestAnimationFrame(draw);
-}catch(error){canvas.remove();document.documentElement.classList.add('webgl-fallback');console.warn('3D view unavailable; using product artwork fallback.',error.message);}
-function rootReady(){document.documentElement.classList.add('webgl-ready');document.documentElement.classList.remove('scene-loading');window.dispatchEvent(new Event('vyra3dready'));}
+  root.classList.add('scene-loading');await nextPaint();
+  renderer=new THREE.WebGLRenderer({canvas,alpha:true,antialias:true,powerPreference:'high-performance'});
+  renderer.setClearColor(0,0);renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.08;
+  scene=new THREE.Scene();camera=new THREE.PerspectiveCamera(31,1,.1,50);camera.position.set(0,0,11);
+  await nextPaint();lighting();brushed=brushedMetal();
+  trimMaterial=new THREE.MeshStandardMaterial({color:'#ffffff',vertexColors:true,metalness:.95,roughness:.27,envMapIntensity:1.25,bumpMap:brushed,bumpScale:.0006});
+  await document.fonts.load('400 40px "VYRA Can"');
+  for(let i=0;i<5;i++){artworks.push(label(i));renderer.initTexture(artworks[i].color);renderer.initTexture(artworks[i].surface);await nextPaint();}
+  for(let i=-3;i<=3;i++){const model=can(i);model.userData.logical=i;applyArtwork(model,i);scene.add(model);models.push(model);}
+  measure();state.scroll=clamp((scrollY-top)/range);last=performance.now();
+  await renderer.compileAsync(scene,camera);state.position=state.index;requestAnimationFrame(draw);
+  addEventListener('resize',measure);
+  canvas.addEventListener('webglcontextlost',event=>{event.preventDefault();active=false;root.classList.remove('webgl-ready');root.classList.add('webgl-fallback');canvas.style.visibility='hidden';});
+  canvas.addEventListener('webglcontextrestored',()=>{active=true;firstFrame=false;dirty=true;canvas.style.visibility='';root.classList.remove('webgl-fallback');last=performance.now();requestAnimationFrame(draw);});
+}catch(error){canvas.remove();root.classList.remove('scene-loading');root.classList.add('webgl-fallback');console.warn('3D unavailable; product artwork remains available.',error.message);}
