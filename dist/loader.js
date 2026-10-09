@@ -7,7 +7,8 @@ function reveal(){
   if(finished)return;
   finished=true;
   clearTimeout(watchdog);
-  status.textContent='YOUR FREQUENCY IS READY';
+  status.textContent='Collection ready';
+  document.querySelector('#loader-percent').textContent='100';
   loader.style.setProperty('--load',1);
   setTimeout(()=>{
     root.classList.remove('is-loading');
@@ -20,7 +21,8 @@ for(const el of document.querySelectorAll('header,main,footer,.skip-link')){el.i
 window.addEventListener('vyra-load',event=>{
   if(finished)return;
   loader.style.setProperty('--load',event.detail.progress);
-  status.textContent=event.detail.label;
+  status.textContent='Preparing the collection';
+  document.querySelector('#loader-percent').textContent=String(Math.round(event.detail.progress*100)).padStart(2,'0');
   if(event.detail.ready)reveal();
 });
 document.querySelector('#loader-enter').addEventListener('click',reveal);
