@@ -107,5 +107,6 @@ button:focus-visible,a:focus-visible,summary:focus-visible,.stage:focus-visible{
 }
 @media(max-width:900px) and (min-width:761px){.questions{grid-template-columns:1fr;gap:15px;padding:90px 10%}.faq-heading h2{font-size:52px}.faq-list{padding-top:0}}
 @media(max-width:380px){.copy-panel h2{font-size:30px}.copy-panel p{font-size:12px}.detail-copy{bottom:14%;height:175px}.faq-heading h2{font-size:38px}}
+@media(max-width:900px){.hero-eyebrow{display:none}}
 @media(max-height:740px) and (min-width:901px){.hero-eyebrow,.edition{top:112px}.selection{bottom:39px}.flavor-title h2{font-size:25px}.hero-footer{bottom:10px}.chapter-label{top:17%}}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*:before,*:after{transition:none!important;animation:none!important}}

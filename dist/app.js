@@ -1,5 +1,6 @@
 'use strict';
 import {experienceBeat, chapterStops} from './experience-timeline.js';
+import {carouselPose} from './product-motion.js';
 const flavors = [
   {glow:'#743cff',name:'MIDNIGHT LYCHEE',lines:['MIDNIGHT','LYCHEE'],color:'#b49aff',rgb:'143,97,255',hue:0,notes:['FLORAL','BRIGHT','CRISP'],description:'Soft lychee. A flash of citrus. A bright, sparkling finish that takes the night somewhere new.'},
   {glow:'#e5005e',name:'RASPBERRY RUSH',lines:['RASPBERRY','RUSH'],color:'#ff7bb7',rgb:'241,16,110',hue:55,notes:['BERRY','TART','ELECTRIC'],description:'A burst of raspberry with a sharp, juicy edge. Bold from the first sip, bright to the very last.'},
@@ -39,10 +40,11 @@ function selectFlavor(index){
   $('#detail-description').textContent=f.description;$('#detail-flavor').textContent=f.name;
   $('#flavor-notes').replaceChildren(...f.notes.map(note=>{const span=document.createElement('span');span.textContent=note;return span;}));
   document.querySelectorAll('.flavor-dot').forEach((el,i)=>el.setAttribute('aria-pressed',String(i===selected)));
-  const gap=innerWidth<=900 ? innerHeight/(2*Math.tan(31*Math.PI/360)*11)*1.18 : innerWidth*.151;
+  const gap=innerWidth<=900 ? innerHeight/(2*Math.tan(31*Math.PI/360)*11)*1.18 : innerWidth*.16;
   document.querySelectorAll('.can').forEach(el=>{
     const slot=Number(el.dataset.slot),fi=wrap(selected+slot),active=slot===0;
-    el.classList.toggle('selected',active);el.style.setProperty('--x',slot*gap*11/(11+.32*Math.abs(slot)**1.3)+'px');
+    const depth=carouselPose(slot,visualIndex+slot,0,0,0,false).depth;
+    el.classList.toggle('selected',active);el.style.setProperty('--x',slot*gap*11/(11-depth)+'px');
     el.style.setProperty('--tilt',active?'-16deg':(slot<0?'-5deg':'5deg'));
     el.style.setProperty('--scale',active?1.13: .86-Math.abs(slot)*.025);
     el.style.setProperty('--brightness',active?'1.05':'.34');el.style.setProperty('--opacity',Math.abs(slot)===3?'.7':'1');
@@ -85,8 +87,10 @@ function updateScroll(){
   const rect=experience.getBoundingClientRect(),range=Math.max(1,experience.offsetHeight-innerHeight);
   document.body.classList.toggle('below-products',rect.bottom<100);
   const progress=Math.min(1,Math.max(0,-rect.top/range));
-  const heroExit=Math.min(1,Math.max(0,(innerHeight-rect.top)/(innerHeight*.85)));
-  const collection=$('#collection');collection.style.setProperty('--hero-exit',heroExit.toFixed(3));collection.classList.toggle('hero-exiting',heroExit>.94);
+  const heroTravel=Math.max(0,innerHeight-rect.top);
+  const heroExit=Math.min(1,heroTravel/(innerHeight*.30));
+  // Fade the selector before the zoom crosses it; defer hit-testing removal so anchor clicks survive auto-scroll.
+  const collection=$('#collection');collection.style.setProperty('--hero-exit',heroExit.toFixed(3));collection.classList.toggle('hero-exiting',heroTravel>innerHeight*.8);
   const next=experienceBeat(progress).chapter;
   if(chapter!==next){chapter=next;document.querySelectorAll('.copy-panel').forEach((el,i)=>{el.classList.toggle('active',i===chapter);el.inert=i!==chapter;});
     document.querySelectorAll('[data-go]').forEach((el,i)=>{if(i===chapter)el.setAttribute('aria-current','step');else el.removeAttribute('aria-current');});$('#chapter-count').textContent='0'+(chapter+1)+' / 04';}

@@ -6,13 +6,15 @@ A runnable cinematic product website with an original fictional brand. Its float
 
 ![VYRA aluminum and print finish](docs/aluminum-detail.jpg)
 
+![VYRA carousel depth and compound rotation](docs/rotation.jpg)
+
 ## Run
 
 Run `npm start` in this folder and open `http://127.0.0.1:3000/`. Serve `dist` on any static HTTP host for deployment. Opening the HTML directly uses the artwork fallback because the 3D renderer requires HTTP modules.
 
 ## Product experience
 
-- Seven visible carousel positions wrap through five original flavors. Selected-product emphasis, varied depth and rotation, detachable modeled lids and bases, restrained parallax and damped transitions.
+- Seven visible carousel positions wrap through five original flavors. The selected can moves forward along a continuous depth curve, with compound pitch, yaw and roll, restrained pointer parallax and smooth quaternion transitions. Detached modeled lids and bases turn around their own axes and align with the shell as they close. The fuller can radius is baked into the shared geometry, keeping its proportions constant through rotation.
 - Gradually formed shoulders, fine rolled seams, recessed lid stampings on both sides, an extruded pull tab and rivet, and a domed base with pressure ribs. Printed ink and lacquer use separate roughness and metalness values. Fine draw marks and subtly varied lacquer roughness break up the uniform surface; graduated studio softboxes produce broad aluminum reflections.
 - One continuous backdrop carries the homepage into the close-up without a section boundary. Rich flavor color and stronger metallic highlights return outside the dark reading sequence. Supporting cans move offstage rather than shrinking into visible fragments.
 - Four product chapters share a single scroll timeline with the renderer. Three reading holds illuminate successive back-label areas with a real projected spotlight. A soft flavor-tinted glow follows only the current text area, fading away as the spotlight moves. The halo is sampled on the curved can surface without a fullscreen bloom pass. The camera gently tracks and enlarges the can during these moments.
@@ -38,12 +40,13 @@ Local browser checks during this revision recorded a 2.6-second baseline first 3
 - `dist/styles.css` — presentation and responsive composition.
 - `dist/app.js` — flavor controls, keyboard/swipe input, menu and FAQ-related state.
 - `dist/experience-timeline.js` — shared chapter, spotlight and lineup beats.
+- `dist/product-motion.js` — continuous carousel depth, can orientation and independent end motion.
 - `dist/scene.js` — model geometry, original label textures, physical lighting and camera choreography.
 - `dist/vendor` — locally bundled Three.js under its MIT license.
 - `dist/assets` — fallback artwork and licensed fonts.
 - `server.cjs` — optional local HTTP preview.
 
-Run `npm run check` for source syntax and `npm test` for timeline regressions. The tests verify that chapter links land on their matching label hold, the light pauses on each text area, and the final lineup restores the lighting and remains visible through the exit.
+Run `npm run check` for source syntax and `npm test` for timeline and motion regressions. The tests verify that chapter links land on their matching label hold, the light pauses on each text area, the final lineup restores lighting through the exit, can rotation stays continuous between carousel positions, and reduced motion removes drifting and parallax.
 
 ## Credits and reference limits
 

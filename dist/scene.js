@@ -1,6 +1,7 @@
 import * as THREE from './vendor/three.module.js';
 import {RectAreaLightUniformsLib} from './vendor/addons/RectAreaLightUniformsLib.js';
 import {clamp,smooth,experienceBeat} from './experience-timeline.js';
+import {carouselPose} from './product-motion.js';
 
 const started=performance.now();
 const state={index:0,position:0,scroll:0,motion:!matchMedia('(prefers-reduced-motion: reduce)').matches,pointer:new THREE.Vector2(),pointerTarget:new THREE.Vector2()};
@@ -15,6 +16,8 @@ let renderer,scene,camera,environment,softbox,edgeLight,ceilingLight,accentLight
 let template,brushed,trimMaterial,models=[],artworks=[],firstFrame=false,active=true,dirty=true,lastRendered=0,last=performance.now(),lastPointer=0;
 let top=0,range=1,end=0,viewH=0,viewW=0,frustumH=0,frustumW=0,lastStyle='';
 const beamTarget=new THREE.Vector3(),beamPosition=new THREE.Vector3();
+const poseEuler=new THREE.Euler(0,0,0,'ZYX'),heroRotation=new THREE.Quaternion(),detailRotation=new THREE.Quaternion(),lineupRotation=new THREE.Quaternion(),partRotation=new THREE.Quaternion(),inverseRotation=new THREE.Quaternion(),lineupPosition=new THREE.Vector3();
+const endAxis=new THREE.Vector3(0,1,0);
 const neutral=new THREE.Color('#f2eee9'),flavorColor=new THREE.Color();
 const wrap=n=>((n%5)+5)%5;
 const nextPaint=()=>new Promise(resolve=>requestAnimationFrame(()=>setTimeout(resolve,0)));
@@ -134,6 +137,8 @@ function mergeStatic(group){
       for(const geometry of geometries){array.set(geometry.attributes[name].array,offset);offset+=geometry.attributes[name].array.length;}
       merged.setAttribute(name,new THREE.BufferAttribute(array,size));
     }
+    // Bake the preferred fuller radius into the mesh so rotations cannot stretch its ends.
+    merged.scale(1.36,1,1.36);
     group.add(new THREE.Mesh(merged,trimMaterial));geometries.forEach(g=>g.dispose());
   }
 }
@@ -152,6 +157,7 @@ function can(index){
   const geometry=new THREE.LatheGeometry(profile.map(([y,r])=>new THREE.Vector2(r,y)),72,-Math.PI/2);
   // Lathe's default UVs space profile points equally; labels need real height.
   for(let i=0;i<geometry.attributes.uv.count;i++)geometry.attributes.uv.setY(i,(geometry.attributes.position.getY(i)+1.75)/3.44);
+  geometry.scale(1.36,1,1.36);
   const artwork=artworks[wrap(index)];
   const material=new THREE.MeshPhysicalMaterial({map:artwork.color,emissiveMap:artwork.glow,emissive:'#ffffff',emissiveIntensity:0,metalnessMap:artwork.surface,roughnessMap:artwork.surface,metalness:1,roughness:1,clearcoat:.18,clearcoatRoughness:.32,envMapIntensity:1,bumpMap:brushed,bumpScale:.0011});
   focusedPrint(material);g.add(new THREE.Mesh(geometry,material));
@@ -283,32 +289,33 @@ function draw(now){
   const heroScale=frustumH*heroHeight/viewH/3.5;
   const detailHeight=mobile?viewH*(viewH<720?.33:.41):Math.min(viewH*.76,750);
   const detailScale=frustumH*detailHeight/viewH/3.5*(1+beat.focus*(mobile?.13:.12)+beat.scan*.022*beat.focus);
-  const gap=mobile?1.18:frustumW*.151;
+  const gap=mobile?1.18:frustumW*.16;
   const lineupScale=frustumH*(mobile?.29:.43)/3.5;
   let focusModel;
   for(const model of models){
     let logical=model.userData.logical;
     if(Math.abs(logical-state.position)>3.5){logical+=Math.round((state.position-logical)/7)*7;model.userData.logical=logical;applyArtwork(model,logical);}
-    const offset=logical-state.position,focus=1-smooth(Math.abs(offset)),isSelected=logical===state.index;
-    const bob=state.motion?Math.sin(now*.00065+logical*.7)*.022:0;
-    const heroX=offset*gap,heroY=frustumH*(mobile?.075:.065)+Math.sin(logical*1.8)*.12*(1-focus)+bob;
-    const heroZ=-.32*Math.abs(offset)**1.3;
+    const offset=logical-state.position,isSelected=logical===state.index;
+    const pose=carouselPose(offset,logical,now/1000,state.pointer.x,state.pointer.y,state.motion,velocity),focus=pose.focus;
+    const heroX=offset*gap,heroY=frustumH*(mobile?.075:.065)+Math.sin(logical*1.8)*.12*(1-focus)+pose.float;
+    const heroZ=pose.depth;
     const detailX=mobile?frustumW*.01:frustumW*.19;
     const detailY=frustumH*(mobile?.145:-.008+beat.scan*.024*beat.focus)+frustumH*exit;
     const t=isSelected?entry:0;
     let scale=THREE.MathUtils.lerp(heroScale*(.84+.23*focus),detailScale,t)*(isSelected?1:1-entry*.15);
     model.position.set(THREE.MathUtils.lerp(heroX*(isSelected?1:1+entry*5),detailX,t),THREE.MathUtils.lerp(heroY,detailY,t),THREE.MathUtils.lerp(heroZ,.25,t));
-    const baseTurn=focus<.99?(Math.abs(Math.round(offset))%2?Math.PI*.92:Math.PI*.18)*Math.sign(offset):0;
     const rotation=state.motion?Math.PI*(beat.turn+beat.returnTurn):(beat.chapter>0&&!beat.returnTurn?Math.PI:0);
-    model.rotation.set(.09,THREE.MathUtils.lerp(baseTurn,rotation,t)+state.pointer.x*.035*focus-velocity*.1,THREE.MathUtils.lerp(.22*focus+Math.sin(logical*1.9)*.1*(1-focus),.27+beat.scan*.03*beat.focus,t)+velocity*.025,'ZYX');
+    heroRotation.setFromEuler(poseEuler.set(pose.pitch,pose.yaw,pose.roll,'ZYX'));
+    const turnPitch=.13+Math.sin(beat.turn*Math.PI)*.22*(1-beat.focus);
+    detailRotation.setFromEuler(poseEuler.set(turnPitch,rotation+state.pointer.x*.025*(1-beat.focus),.34+beat.scan*.018*beat.focus,'ZYX'));
+    model.quaternion.copy(heroRotation).slerp(detailRotation,t);
     if(reveal>0){
       scale=THREE.MathUtils.lerp(scale,lineupScale,reveal);
-      model.position.lerp(new THREE.Vector3(offset*(mobile?frustumW*.29:frustumW*.132),frustumH*(mobile?.09:.035)+offset*lineupScale*.105+frustumH*exit,-Math.abs(offset)*.08),reveal);
-      model.rotation.x=THREE.MathUtils.lerp(model.rotation.x,.23,reveal);
-      model.rotation.y=THREE.MathUtils.lerp(model.rotation.y,Math.PI*2+offset*.05,reveal);
-      model.rotation.z=THREE.MathUtils.lerp(model.rotation.z,.16,reveal);
+      model.position.lerp(lineupPosition.set(offset*(mobile?frustumW*.29:frustumW*.132),frustumH*(mobile?.09:.035)+offset*lineupScale*.105+frustumH*exit,-Math.abs(offset)*.08),reveal);
+      lineupRotation.setFromEuler(poseEuler.set(.31,Math.PI*2+offset*.12,.18,'ZYX'));
+      model.quaternion.slerp(lineupRotation,reveal);
     }
-    model.scale.set(Math.max(.0001,scale*1.36),Math.max(.0001,scale),Math.max(.0001,scale*1.36));model.visible=scale>.01&&(isSelected||entry<.7||reveal>.01);
+    model.scale.setScalar(Math.max(.0001,scale));model.visible=scale>.01&&(isSelected||entry<.7||reveal>.01);
     const material=model.userData.material;
     material.emissive.copy(flavorColor).lerp(neutral,.42);
     material.emissiveIntensity=isSelected?beat.focus*2.6:0;
@@ -317,14 +324,23 @@ function draw(now){
     material.envMapIntensity=(.55+.5*focus)*(1-beat.focus*.84);
     material.clearcoat=.18*(1-beat.focus*.9);
     const explode=focus*(1-entry)*(1-reveal);
-    model.userData.lid.position.y=1.71+.62*explode;model.userData.lid.rotation.x=.38*explode;
-    model.userData.bottom.position.y=-1.73-.4*explode;model.userData.bottom.rotation.x=.23*explode;
+    // Detached ends keep their own world orientation, then align with the shell as they close.
+    model.userData.lid.position.y=1.71+.67*explode;
+    partRotation.setFromEuler(poseEuler.set(pose.lidPitch,0,pose.lidRoll,'ZYX'));
+    partRotation.multiply(inverseRotation.setFromAxisAngle(endAxis,pose.lidYaw));
+    inverseRotation.copy(model.quaternion).invert().multiply(partRotation);
+    model.userData.lid.quaternion.identity().slerp(inverseRotation,explode);
+    model.userData.bottom.position.y=-1.73-.63*explode;
+    partRotation.setFromEuler(poseEuler.set(pose.basePitch,0,pose.baseRoll,'ZYX'));
+    partRotation.multiply(inverseRotation.setFromAxisAngle(endAxis,pose.baseYaw));
+    inverseRotation.copy(model.quaternion).invert().multiply(partRotation);
+    model.userData.bottom.quaternion.identity().slerp(inverseRotation,explode);
     if(isSelected)focusModel=model;
   }
   if(focusModel){
     focusModel.updateMatrixWorld(true);
     const localY=1.69-(910+290*beat.scan)/2048*3.44;
-    beamTarget.set(0,localY,-.475).applyMatrix4(focusModel.matrixWorld);
+    beamTarget.set(0,localY,-.475*1.36).applyMatrix4(focusModel.matrixWorld);
     beamPosition.copy(beamTarget).add(new THREE.Vector3(focusModel.scale.y*2.4,focusModel.scale.y*.1,focusModel.scale.y*1.8));
     flavorSpot.position.copy(beamPosition);flavorSpot.target.position.copy(beamTarget);
   }
