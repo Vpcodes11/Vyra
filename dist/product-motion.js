@@ -9,17 +9,17 @@ export function carouselPose(offset, logical, seconds, pointerX=0, pointerY=0, m
   const transfer=motion?Math.atan(velocity)*.30:0;
   return {
     focus,
-    depth:.30*focus-.44*Math.abs(offset)**1.4,
+    depth:(.30+(motion?Math.sin(phase*.91)*.10:0))*focus-.44*Math.abs(offset)**1.4,
     float:motion?Math.sin(phase*.83)*.026:0,
-    pitch:.10+.14*focus+(motion?Math.cos(phase*.91)*.065*focus:0)+(motion?pointerY*.17*focus:0),
-    yaw:turn*(1-focus)+focus*(.20+sway*.15+(motion?pointerX*.42:0))-transfer,
-    roll:.32*focus+Math.sin(logical*1.9)*.045*(1-focus)+sway*.025*focus+transfer*.08,
-    lidPitch:.50+sway*.045,
+    pitch:.10-.02*focus+(motion?Math.cos(phase*.91)*.24*focus:.16*focus)+(motion?pointerY*.20*focus:0),
+    yaw:turn*(1-focus)+focus*(.18+sway*.48+(motion?pointerX*.48:0))-transfer,
+    roll:.32*focus+Math.sin(logical*1.9)*.045*(1-focus)+Math.sin(phase*.91)*.085*focus+transfer*.08,
+    lidPitch:.32+(motion?Math.cos(phase*.83)*.26:0),
     lidYaw:motion?seconds*.14:0,
-    lidRoll:-.04+sway*.065,
-    basePitch:.20-sway*.045,
+    lidRoll:-.04+sway*.12,
+    basePitch:-.08+(motion?Math.sin(phase*.83+.7)*.25:0),
     baseYaw:motion?-seconds*.11:0,
-    baseRoll:.045-sway*.045
+    baseRoll:.045-sway*.10
   };
 }
 

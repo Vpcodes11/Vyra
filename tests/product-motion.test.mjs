@@ -35,3 +35,12 @@ test('the closing collection recedes in depth and exposes different ends',()=>{
     for(const value of Object.values(lineupPose(offset)))assert.ok(Number.isFinite(value));
   }
 });
+
+// Rocking through both pitch signs must expose the lid and base over a full cycle.
+test('opening orbit reveals both ends without turning the front label away',()=>{
+  const poses=Array.from({length:121},(_,i)=>carouselPose(0,0,i*.15));
+  assert.ok(Math.min(...poses.map(p=>p.pitch))<-.12);
+  assert.ok(Math.max(...poses.map(p=>p.pitch))>.30);
+  assert.ok(Math.max(...poses.map(p=>p.yaw))-Math.min(...poses.map(p=>p.yaw))>.9);
+  assert.ok(poses.every(p=>Math.abs(p.yaw)<Math.PI/2));
+});
