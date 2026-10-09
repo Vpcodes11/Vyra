@@ -6,12 +6,18 @@
   <title>VYRA Energy — Find your frequency</title>
   <meta name="description" content="Five flavors. A different frequency. Explore the VYRA Energy collection in an immersive product experience.">
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23110d1c'/%3E%3Cpath d='M6 7h6l4 16 5-16h6L19 27h-7z' fill='%23d2b7ff'/%3E%3C/svg%3E">
-  <link rel="stylesheet" href="styles.css">
+  <script>document.documentElement.classList.add("is-loading")</script><script src="loader.js" defer></script><link rel="stylesheet" href="styles.css">
   <link rel="preload" href="assets/RacingSansOne-Regular.ttf" as="font" type="font/ttf" crossorigin>
   <script type="module" src="app.js"></script>
   <script type="module" src="scene.js"></script>
 </head>
 <body>
+  <div id="loader" class="loader" role="status" aria-live="polite" style="--load:.06">
+    <div class="loader-top"><span>VYRA / ENERGY</span><span>VOL. 01</span></div>
+    <div class="loader-orbit" aria-hidden="true"><div class="loader-ring"></div><div class="loader-can"><span>VYRA</span><i></i></div></div>
+    <div class="loader-title" aria-hidden="true">FIND YOUR<br><em>FREQUENCY.</em></div>
+    <div class="loader-bottom"><div class="loader-meter" aria-hidden="true"><span></span></div><p id="loader-status">TUNING INTO THE NIGHT</p><button id="loader-enter" hidden>ENTER THE EXPERIENCE ↗</button><span class="loader-edition">FIVE FLAVORS. ONE FREQUENCY.</span></div>
+  </div>
   <div class="studio-backdrop" aria-hidden="true"><div class="studio-aura"></div></div>
   <a class="skip-link" href="#collection">Skip to flavors</a>
   <header class="header">
@@ -71,4 +77,3 @@
   <noscript><style>.can-row:before{content:'Enable JavaScript to explore the interactive flavor collection.';position:absolute;inset:35% 20%;color:white}.experience{height:auto}.experience-sticky{min-height:850px}</style></noscript>
 </body>
 </html>
-

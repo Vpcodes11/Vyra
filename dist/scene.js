@@ -4,6 +4,7 @@ import {clamp,smooth,experienceBeat,cinemaFrame} from './experience-timeline.js'
 import {carouselPose,lineupPose} from './product-motion.js';
 
 const started=performance.now();
+const loading=(progress,label,ready=false)=>window.dispatchEvent(new CustomEvent('vyra-load',{detail:{progress,label,ready}}));
 const state={index:0,position:0,scroll:0,motion:!matchMedia('(prefers-reduced-motion: reduce)').matches,pointer:new THREE.Vector2(),pointerTarget:new THREE.Vector2()};
 const colors=['#8555ff','#ef2879','#d5db39','#16c5a2','#f78d35'];
 const lacquer=['#4b376e','#6a2948','#53551e','#235d50','#694125'];
@@ -44,7 +45,7 @@ function label(index){
   const grain=mc.createImageData(512,1024);let grainSeed=91;
   for(let i=0;i<grain.data.length;i+=4){
     grainSeed=(Math.imul(grainSeed,1664525)+1013904223)>>>0;
-    grain.data[i]=0;grain.data[i+1]=70+(grainSeed%23)+Math.round(Math.sin((i/4%512)*.038)*4);grain.data[i+2]=193+(grainSeed%13);grain.data[i+3]=255;
+    grain.data[i]=0;grain.data[i+1]=52+(grainSeed%19)+Math.round(Math.sin((i/4%512)*.038)*4);grain.data[i+2]=222+(grainSeed%17);grain.data[i+3]=255;
   }
   mc.putImageData(grain,0,0);
   // Bare aluminum at the neck and heel catches the same studio lights as the ends.
@@ -176,7 +177,7 @@ function can(index){
   for(let i=0;i<geometry.attributes.uv.count;i++)geometry.attributes.uv.setY(i,(geometry.attributes.position.getY(i)+1.75)/3.44);
   geometry.scale(1.36,1,1.36);
   const artwork=artworks[wrap(index)];
-  const material=new THREE.MeshPhysicalMaterial({map:artwork.color,emissiveMap:artwork.glow,emissive:'#ffffff',emissiveIntensity:0,metalnessMap:artwork.surface,roughnessMap:artwork.surface,metalness:1,roughness:1,clearcoat:.18,clearcoatRoughness:.32,envMapIntensity:1,bumpMap:brushed,bumpScale:.0021,anisotropy:.18});
+  const material=new THREE.MeshPhysicalMaterial({map:artwork.color,emissiveMap:artwork.glow,emissive:'#ffffff',emissiveIntensity:0,metalnessMap:artwork.surface,roughnessMap:artwork.surface,metalness:1,roughness:1,clearcoat:.24,clearcoatRoughness:.24,envMapIntensity:1,bumpMap:brushed,bumpScale:.0021,anisotropy:.38});
   focusedPrint(material);g.add(new THREE.Mesh(geometry,material));
   const metal=new THREE.MeshPhysicalMaterial({color:'#aeb5b9',metalness:1,roughness:.23,clearcoat:.08,clearcoatRoughness:.3,envMapIntensity:1.5,bumpMap:brushed,bumpScale:.0007});
   const satinMetal=new THREE.MeshStandardMaterial({color:'#9aa0a3',metalness:.92,roughness:.34,envMapIntensity:1.1,bumpMap:brushed,bumpScale:.0011});
@@ -290,7 +291,7 @@ function draw(now){
   ambientLight.intensity=.18*(1-beat.focus*.85);
   accentLight.intensity=3.4*(1-beat.focus*.91);
   flavorSpot.intensity=beat.focus*80;
-  trimMaterial.envMapIntensity=1.25*(1-beat.focus*.76);
+  trimMaterial.envMapIntensity=1.5*(1-beat.focus*.76);
   const style=[entry,beat.focus,reveal,beat.copy].map(v=>v.toFixed(3)).join('/');
   if(style!==lastStyle){
     setStyle('--studio-color-strength',(.22+entry*1.05)*(1-beat.focus*.48)*(1-reveal*.82));
@@ -346,8 +347,8 @@ function draw(now){
     material.emissiveIntensity=isSelected?beat.focus*2.2:0;
     material.userData.focusCenter.value=1-(910+290*beat.scan)/2048;
     material.color.setScalar(THREE.MathUtils.lerp(.32+.68*focus,1,reveal));
-    material.envMapIntensity=(.35+.7*focus)*(1-beat.focus*.88);
-    material.clearcoat=.18*(1-beat.focus*.9);
+    material.envMapIntensity=(.40+.95*focus)*(1-beat.focus*.88);
+    material.clearcoat=.24*(1-beat.focus*.9);
     const explode=focus*(1-entry)*(1-reveal);
     // Detached ends keep their own world orientation, then align with the shell as they close.
     model.userData.lid.position.y=1.71+.67*explode;
@@ -371,7 +372,7 @@ function draw(now){
   }
   renderer.render(scene,camera);
   if(!firstFrame){
-    firstFrame=true;root.classList.add('webgl-ready');root.classList.remove('scene-loading');canvas.style.opacity='1';
+    firstFrame=true;loading(1,'YOUR FREQUENCY IS READY',true);root.classList.add('webgl-ready');root.classList.remove('scene-loading');canvas.style.opacity='1';
     window.dispatchEvent(new Event('vyra3dready'));
     console.info(`VYRA scene: first 3D frame ${Math.round(performance.now())} ms after navigation; setup ${Math.round(performance.now()-started)} ms; ${renderer.info.render.calls} draw calls; ${renderer.info.render.triangles} triangles.`);
   }
@@ -386,18 +387,18 @@ document.addEventListener('visibilitychange',()=>{
 });
 addEventListener('scroll',()=>{dirty=true;},{passive:true});
 try{
-  root.classList.add('scene-loading');await nextPaint();
+  root.classList.add('scene-loading');loading(.16,'SETTING THE STAGE');await nextPaint();
   renderer=new THREE.WebGLRenderer({canvas,alpha:true,antialias:true,powerPreference:'high-performance'});
   renderer.setClearColor(0,0);renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.08;
   scene=new THREE.Scene();camera=new THREE.PerspectiveCamera(31,1,.1,50);camera.position.set(0,0,11);
-  await nextPaint();lighting();brushed=brushedMetal();
-  trimMaterial=new THREE.MeshStandardMaterial({color:'#ffffff',vertexColors:true,side:THREE.DoubleSide,metalness:.95,roughness:.3,envMapIntensity:1.25,bumpMap:brushed,bumpScale:.0012});
+  await nextPaint();lighting();brushed=brushedMetal();loading(.30,'SHAPING THE LIGHT');
+  trimMaterial=new THREE.MeshStandardMaterial({color:'#ffffff',vertexColors:true,side:THREE.DoubleSide,metalness:1,roughness:.23,envMapIntensity:1.5,bumpMap:brushed,bumpScale:.0012});
   await Promise.all([document.fonts.load('400 40px "VYRA Can"'),document.fonts.load('400 40px "VYRA Display"')]);
-  for(let i=0;i<5;i++){artworks.push(label(i));renderer.initTexture(artworks[i].color);renderer.initTexture(artworks[i].surface);renderer.initTexture(artworks[i].glow);await nextPaint();}
+  for(let i=0;i<5;i++){loading(.35+i*.085,'BRINGING THE FLAVORS TO LIFE');artworks.push(label(i));renderer.initTexture(artworks[i].color);renderer.initTexture(artworks[i].surface);renderer.initTexture(artworks[i].glow);await nextPaint();}
   for(let i=-5;i<=5;i++){const model=can(i);model.userData.logical=i;applyArtwork(model,i);scene.add(model);models.push(model);}
   measure();state.scroll=clamp((scrollY-top)/range);last=performance.now();
-  await renderer.compileAsync(scene,camera);state.position=state.index;requestAnimationFrame(draw);
+  loading(.86,'FINDING YOUR FREQUENCY');await renderer.compileAsync(scene,camera);state.position=state.index;requestAnimationFrame(draw);
   addEventListener('resize',measure);
   canvas.addEventListener('webglcontextlost',event=>{event.preventDefault();active=false;root.classList.remove('webgl-ready');root.classList.add('webgl-fallback');canvas.style.visibility='hidden';});
   canvas.addEventListener('webglcontextrestored',()=>{active=true;firstFrame=false;dirty=true;canvas.style.visibility='';root.classList.remove('webgl-fallback');last=performance.now();requestAnimationFrame(draw);});
-}catch(error){canvas.remove();root.classList.remove('scene-loading');root.classList.add('webgl-fallback');console.warn('3D unavailable; product artwork remains available.',error.message);}
+}catch(error){loading(1,'YOUR FREQUENCY IS READY',true);canvas.remove();root.classList.remove('scene-loading');root.classList.add('webgl-fallback');console.warn('3D unavailable; product artwork remains available.',error.message);}

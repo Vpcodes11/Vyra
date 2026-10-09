@@ -14,10 +14,13 @@ A runnable cinematic product website with an original fictional brand. Its float
 
 Run `npm start` in this folder and open `http://127.0.0.1:3000/`. Serve `dist` on any static HTTP host for deployment. Opening the HTML directly uses the artwork fallback because the 3D renderer requires HTTP modules.
 
+![VYRA cinematic loading screen](docs/loading.jpg)
+
 ## Product experience
 
+- A lightweight branded loading scene uses a floating metallic can, swept light, original typography and actual preparation milestones. It dissolves after the first 3D frame, respects reduced motion, keeps underlying controls out of keyboard focus, and provides a delayed entry button plus a timeout escape on slow connections.
 - Seven visible carousel positions wrap through five original flavors. The selected can moves forward along a continuous depth curve, with a wider side-to-side turn, alternating lid/base exposure, compound pitch and roll, restrained pointer parallax and smooth quaternion transitions. Detached modeled lids and bases turn around their own axes and align with the shell as they close. The fuller can radius is baked into the shared geometry, keeping its proportions constant through rotation.
-- Gradually formed shoulders, fine rolled seams, recessed lid stampings on both sides, an extruded pull tab and rivet, and a domed base with pressure ribs. Printed ink and lacquer use separate roughness and metalness values. Fine draw marks and subtly varied lacquer roughness break up the uniform surface; asymmetric studio softboxes and directional lacquer reflections give the finish more depth. Compact original packaging headings, small print and an edition barcode sharpen the label detail.
+- Gradually formed shoulders, fine rolled seams, recessed lid stampings on both sides, an extruded pull tab and rivet, and a domed base with pressure ribs. Printed ink and lacquer use separate roughness and metalness values. Fine draw marks and subtly varied lacquer roughness break up the uniform surface; higher metallicity, sharper bare-aluminum edges, asymmetric studio softboxes and directional lacquer reflections give the finish more depth. Compact original packaging headings, small print and an edition barcode sharpen the label detail.
 - A quieter neutral opening stage carries the homepage into the rich flavor close-up without a section boundary. Rich flavor color and stronger metallic highlights return outside the dark reading sequence. Supporting cans move offstage rather than shrinking into visible fragments.
 - Four product chapters share a single scroll timeline with the renderer. Three reading holds illuminate successive back-label areas with a real projected spotlight. A tight flavor-tinted glow follows only the current text area, fading away as the spotlight moves. The halo is sampled on the curved can surface without a fullscreen bloom pass. The larger close-up crosses the screen edges, tracking lower label areas upward during these moments.
 - The can turns to its front and pulls back alone before eleven cans enter a dense oblique lineup. Changing depth and pitch expose both lids and bases; the row remains visible before the FAQ.
@@ -40,6 +43,7 @@ Local browser checks during this revision recorded a 2.6-second baseline first 3
 
 - `dist/index.html` — structure and original copy.
 - `dist/styles.css` — presentation and responsive composition.
+- `dist/loader.js` — loading milestones, accessible reveal and slow-connection escape.
 - `dist/app.js` — flavor controls, keyboard/swipe input, menu and FAQ-related state.
 - `dist/experience-timeline.js` — shared chapter, spotlight and lineup beats.
 - `dist/product-motion.js` — continuous carousel depth, can orientation and independent end motion.
